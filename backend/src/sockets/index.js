@@ -1,5 +1,5 @@
 import { Server } from "socket.io";
-import { env } from "../config/env.js";
+import { corsOrigins } from "../config/env.js";
 
 export const socketEvents = [
   "emergency_created",
@@ -13,7 +13,7 @@ export const socketEvents = [
 
 export function createSocketServer(httpServer) {
   const io = new Server(httpServer, {
-    cors: { origin: env.CORS_ORIGIN, credentials: true },
+    cors: { origin: corsOrigins, credentials: true },
   });
 
   io.on("connection", (socket) => {
