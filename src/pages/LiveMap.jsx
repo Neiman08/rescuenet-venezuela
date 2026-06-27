@@ -3,7 +3,7 @@ import SectionTitle from "../components/SectionTitle";
 import MapPreview from "../components/MapPreview";
 import PublicAccessNotice from "../components/PublicAccessNotice";
 import StatusBadge from "../components/StatusBadge";
-import { demoDataEnabled, noRealDataMessage } from "../config/demoData";
+import { demoDataEnabled, noApprovedDataMessage, noRealDataMessage } from "../config/demoData";
 import { affectedZones } from "../data/affectedZones";
 import { mapReports } from "../data/mockData";
 import { gisLayers, logisticsCorridors } from "../data/gisLayers";
@@ -35,7 +35,8 @@ export default function LiveMap() {
       <SectionTitle title="Mapa en vivo" subtitle="Zonas afectadas, radios de impacto y reportes operativos simulados." />
       <PublicAccessNotice text="No necesitas crear cuenta para ver el mapa publico y ubicar ayuda cercana." />
       {status === "fallback" && <div className="rounded-2xl bg-yellow-50 p-4 text-sm font-semibold text-yellow-800">No pudimos conectar con el mapa publico del backend. Mostrando datos simulados locales.</div>}
-      {(status === "error" || status === "empty") && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>}
+      {status === "error" && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>}
+      {status === "empty" && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noApprovedDataMessage}</div>}
       <div className="grid xl:grid-cols-[320px_1fr] gap-6">
         <aside className="card p-5 space-y-4">
           <h2 className="font-black text-lg">Filtros</h2>

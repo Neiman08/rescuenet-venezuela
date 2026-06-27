@@ -6,6 +6,45 @@ import { friendlyApiError, institutionalApi } from "../lib/api";
 
 const recordTypes = ["", "missing_person", "hospitalized_person", "trapped_person", "safe_person", "rescued_person", "hospital", "shelter", "help_center"];
 const statuses = ["", "NO_VERIFICADO", "APROBADO", "RECHAZADO", "DUPLICADO"];
+const csvTemplates = [
+  "missing-persons.csv",
+  "hospitalized-persons.csv",
+  "rescued-persons.csv",
+  "safe-persons.csv",
+  "trapped-persons.csv",
+];
+
+function parseCsv(text) {
+  const rows = [];
+  let current = "";
+  let row = [];
+  let inQuotes = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === "\"" && next === "\"") {
+      current += "\"";
+      index += 1;
+    } else if (char === "\"") {
+      inQuotes = !inQuotes;
+    } else if (char === "," && !inQuotes) {
+      row.push(current.trim());
+      current = "";
+    } else if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(current.trim());
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  row.push(current.trim());
+  if (row.some(Boolean)) rows.push(row);
+  const [headers = [], ...data] = rows;
+  return data.map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] || ""])));
+}
 
 export default function InstitutionalIngestionReview() {
   const [filters, setFilters] = useState({ recordType: "", verificationStatus: "", possibleDuplicate: "" });
@@ -15,6 +54,7 @@ export default function InstitutionalIngestionReview() {
   const [message, setMessage] = useState("");
   const [manualJson, setManualJson] = useState("[\n  {\n    \"nombre\": \"\",\n    \"edad\": \"\",\n    \"estado\": \"desaparecida\",\n    \"zona\": \"\",\n    \"descripcion\": \"\"\n  }\n]");
   const [manualReport, setManualReport] = useState(null);
+  const [selectedRecords, setSelectedRecords] = useState([]);
 
   const load = useCallback(async () => {
     setStatus("loading");
@@ -67,6 +107,43 @@ export default function InstitutionalIngestionReview() {
     }
   }
 
+  async function loadCsvFile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setMessage("");
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setMessage("Por ahora la carga directa del navegador acepta CSV. Exporta Excel o Google Sheets como CSV.");
+      return;
+    }
+    try {
+      const text = await file.text();
+      const rows = parseCsv(text);
+      setManualJson(JSON.stringify(rows, null, 2));
+      setManualReport(null);
+    } catch {
+      setMessage("No pudimos leer el CSV. Verifica que use encabezados y codificacion UTF-8.");
+    }
+  }
+
+  function toggleSelected(id) {
+    setSelectedRecords((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  }
+
+  async function approveSelected() {
+    if (!selectedRecords.length) {
+      setMessage("Selecciona al menos un registro para aprobar.");
+      return;
+    }
+    setMessage("");
+    try {
+      await institutionalApi.approveIngestionRecords(selectedRecords);
+      setSelectedRecords([]);
+      await load();
+    } catch (error) {
+      setMessage(friendlyApiError(error));
+    }
+  }
+
   return (
     <div className="space-y-6">
       <SectionTitle title="Ingesta institucional" subtitle="Revision protegida de registros humanitarios importados desde fuentes publicas." />
@@ -98,10 +175,15 @@ export default function InstitutionalIngestionReview() {
           <div>
             <h2 className="font-black text-lg">Cargar datos reales</h2>
             <p className="text-sm text-slate-600">Solo datos verificados o recopilados por instituciones. El preview no guarda en base de datos.</p>
+            <p className="text-xs text-slate-500 mt-1">Plantillas soportadas: {csvTemplates.join(", ")}. Excel y Google Sheets deben exportarse como CSV.</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <label className="btn bg-blue-600 text-white flex items-center gap-2 cursor-pointer">
+              <FileUp size={17} /> Subir CSV
+              <input className="hidden" type="file" accept=".csv,text/csv" onChange={loadCsvFile} />
+            </label>
             <button className="btn bg-slate-800 text-white flex items-center gap-2" onClick={() => manualUpload(true)}><FileUp size={17} /> Preview</button>
-            <button className="btn bg-rescueGreen text-white flex items-center gap-2" onClick={() => manualUpload(false)}><CheckCircle size={17} /> Importar NO VERIFICADO</button>
+            <button className="btn bg-rescueGreen text-white flex items-center gap-2" onClick={() => manualUpload(false)}><CheckCircle size={17} /> Importar y dejar pendiente de revisión</button>
           </div>
         </div>
         <textarea className="input min-h-48 font-mono text-xs" value={manualJson} onChange={(event) => setManualJson(event.target.value)} />
@@ -120,13 +202,22 @@ export default function InstitutionalIngestionReview() {
 
       <div className="grid xl:grid-cols-[1fr_320px] gap-6">
         <section className="space-y-3">
+          {records.length > 0 && (
+            <div className="card p-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-slate-700">{selectedRecords.length} seleccionados</p>
+              <button className="btn bg-rescueGreen text-white flex items-center gap-2" onClick={approveSelected}><CheckCircle size={17} /> Aprobar seleccionados</button>
+            </div>
+          )}
           {records.map((record) => (
             <article key={record.id} className="card p-5 space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
+                <div className="flex gap-3">
+                  <input className="mt-1 size-5" type="checkbox" checked={selectedRecords.includes(record.id)} onChange={() => toggleSelected(record.id)} aria-label={`Seleccionar ${record.id}`} />
+                  <div>
                   <p className="text-xs font-bold uppercase text-slate-500">{record.sourceName} - {record.recordType}</p>
                   <h2 className="font-black text-lg">{record.publicSafe?.fullName || record.fullName || "Registro sin nombre publico"}</h2>
                   <p className="text-sm text-slate-600">{record.publicSafe?.zone || record.publicSafe?.state || "Zona no indicada"}</p>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <StatusBadge status={record.verificationStatus} />

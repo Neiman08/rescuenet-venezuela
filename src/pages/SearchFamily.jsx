@@ -4,7 +4,7 @@ import { Search, UserPlus } from "lucide-react";
 import PublicAccessNotice from "../components/PublicAccessNotice";
 import SectionTitle from "../components/SectionTitle";
 import DataTable from "../components/DataTable";
-import { demoDataEnabled, noRealDataMessage } from "../config/demoData";
+import { demoDataEnabled, noApprovedDataMessage, noRealDataMessage } from "../config/demoData";
 import { rescuedPeople } from "../data/mockData";
 import { publicApi } from "../lib/api";
 
@@ -58,7 +58,8 @@ export default function SearchFamily() {
         <Link to="/coincidencias" className="btn bg-navy text-white flex items-center justify-center gap-2"><Search size={18} /> Ver coincidencias</Link>
       </div>
       {status === "fallback" && <div className="rounded-2xl bg-yellow-50 p-4 text-sm font-semibold text-yellow-800">No pudimos conectar con el backend. Mostrando datos simulados locales.</div>}
-      {(status === "error" || status === "empty") && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>}
+      {status === "error" && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>}
+      {status === "empty" && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noApprovedDataMessage}</div>}
       <DataTable
         columns={[
           { key: "id", label: "Codigo" },

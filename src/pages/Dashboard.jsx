@@ -5,7 +5,7 @@ import ActionCard from "../components/ActionCard";
 import StatCard from "../components/StatCard";
 import MapPreview from "../components/MapPreview";
 import StatusBadge from "../components/StatusBadge";
-import { demoDataEnabled, noRealDataMessage } from "../config/demoData";
+import { demoDataEnabled, noApprovedDataMessage, noRealDataMessage } from "../config/demoData";
 import { centers, simulationNotice, stats } from "../data/mockData";
 import { publicApi } from "../lib/api";
 
@@ -36,8 +36,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {(status === "error" || (!demoDataEnabled && status === "success" && !Object.keys(dashboardStats).length && !mapData.zones.length && !helpCenters.length)) && (
-        <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>
+      {status === "error" && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>}
+      {!demoDataEnabled && status === "success" && !Object.keys(dashboardStats).length && !mapData.zones.length && !helpCenters.length && (
+        <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noApprovedDataMessage}</div>
       )}
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 rounded-3xl overflow-hidden bg-navy text-white shadow-card relative min-h-[460px]">

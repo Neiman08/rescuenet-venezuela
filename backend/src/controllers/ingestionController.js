@@ -84,6 +84,19 @@ export const ingestionController = {
     res.json({ data: publicRecord(record) });
   }),
 
+  approveMany: asyncHandler(async (req, res) => {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter(Boolean).slice(0, 200) : [];
+    if (!ids.length) {
+      res.status(400).json({ error: { message: "approve-many requires at least one record id." } });
+      return;
+    }
+    const result = await prisma.importedHumanitarianRecord.updateMany({
+      where: { id: { in: ids }, deletedAt: null },
+      data: { verificationStatus: "APROBADO", approvedAt: new Date(), reviewedById: req.user?.id },
+    });
+    res.json({ data: { approved: result.count } });
+  }),
+
   reject: asyncHandler(async (req, res) => {
     const record = await prisma.importedHumanitarianRecord.update({
       where: { id: req.params.id },

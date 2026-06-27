@@ -6,7 +6,7 @@ import DataTable from "../components/DataTable";
 import PublicAccessNotice from "../components/PublicAccessNotice";
 import SectionTitle from "../components/SectionTitle";
 import StatCard from "../components/StatCard";
-import { demoDataEnabled, noRealDataMessage } from "../config/demoData";
+import { demoDataEnabled, noApprovedDataMessage, noRealDataMessage } from "../config/demoData";
 import { chartByZone, donations, expenses, stats } from "../data/mockData";
 import { publicApi } from "../lib/api";
 
@@ -45,7 +45,8 @@ export default function DonationsOverview() {
       <SectionTitle title="Donaciones auditables" subtitle="Panel publico con fondos recibidos, gastos, evidencias y beneficiarios estimados." action={<Link to="/gastos" className="btn bg-navy text-white">Ver gastos</Link>} />
       <PublicAccessNotice text="No necesitas crear cuenta para consultar donaciones publicas y auditoria resumida." />
       {status === "fallback" && <div className="rounded-2xl bg-yellow-50 p-4 text-sm font-semibold text-yellow-800">No pudimos conectar con donaciones publicas del backend. Mostrando datos simulados locales.</div>}
-      {(status === "error" || status === "empty") && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>}
+      {status === "error" && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>}
+      {status === "empty" && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noApprovedDataMessage}</div>}
       <div className="grid md:grid-cols-4 gap-4">
         <StatCard title="Total recibido" value={`$${stats.donationsReceived.toLocaleString()}`} color="green" icon={<HandCoins />} />
         <StatCard title="Total gastado" value={`$${stats.donationsSpent.toLocaleString()}`} color="orange" icon={<ReceiptText />} />
