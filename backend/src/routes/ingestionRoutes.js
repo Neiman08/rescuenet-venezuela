@@ -11,6 +11,7 @@ router.post("/manual-upload", ingestionController.manualUpload);
 router.get("/runs", ingestionController.runs);
 router.get("/records", ingestionController.records);
 router.post("/records/approve-many", ingestionController.approveMany);
+router.post("/records/approve-filtered", ingestionController.approveFiltered);
 router.post("/records/:id/approve", ingestionController.approve);
 router.post("/records/:id/reject", ingestionController.reject);
 router.post("/records/:id/mark-duplicate", ingestionController.markDuplicate);

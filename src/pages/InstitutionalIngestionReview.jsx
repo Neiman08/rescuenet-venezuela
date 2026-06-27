@@ -1,10 +1,26 @@
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle, CopyCheck, FileUp, Play, ShieldAlert, XCircle } from "lucide-react";
+import { CheckCircle, CopyCheck, Download, FileUp, Play, ShieldAlert, XCircle } from "lucide-react";
 import SectionTitle from "../components/SectionTitle";
 import StatusBadge from "../components/StatusBadge";
 import { friendlyApiError, institutionalApi } from "../lib/api";
 
-const recordTypes = ["", "missing_person", "hospitalized_person", "trapped_person", "safe_person", "rescued_person", "hospital", "shelter", "help_center"];
+const recordTypes = [
+  "",
+  "missing_person",
+  "hospitalized_person",
+  "trapped_person",
+  "safe_person",
+  "rescued_person",
+  "hospital",
+  "shelter",
+  "help_center",
+  "collection_center",
+  "water_point",
+  "food_point",
+  "medical_point",
+  "volunteer_center",
+  "donation_need",
+];
 const statuses = ["", "NO_VERIFICADO", "APROBADO", "RECHAZADO", "DUPLICADO"];
 const csvTemplates = [
   "missing-persons.csv",
@@ -47,7 +63,7 @@ function parseCsv(text) {
 }
 
 export default function InstitutionalIngestionReview() {
-  const [filters, setFilters] = useState({ recordType: "", verificationStatus: "", possibleDuplicate: "" });
+  const [filters, setFilters] = useState({ sourceName: "", recordType: "", verificationStatus: "", possibleDuplicate: "" });
   const [records, setRecords] = useState([]);
   const [runs, setRuns] = useState([]);
   const [status, setStatus] = useState("loading");
@@ -144,6 +160,23 @@ export default function InstitutionalIngestionReview() {
     }
   }
 
+  async function approveFiltered() {
+    if (!filters.recordType) {
+      setMessage("Elige un tipo de recurso antes de aprobar en lote.");
+      return;
+    }
+    if (!window.confirm("Estás a punto de publicar registros no verificados. ¿Confirmas?")) return;
+    setMessage("");
+    try {
+      const payload = await institutionalApi.approveFilteredIngestionRecords(filters);
+      setSelectedRecords([]);
+      setMessage(`${payload?.data?.approved || 0} registros filtrados aprobados.`);
+      await load();
+    } catch (error) {
+      setMessage(friendlyApiError(error));
+    }
+  }
+
   return (
     <div className="space-y-6">
       <SectionTitle title="Ingesta institucional" subtitle="Revision protegida de registros humanitarios importados desde fuentes publicas." />
@@ -153,7 +186,8 @@ export default function InstitutionalIngestionReview() {
         <span>Los registros importados permanecen NO VERIFICADOS hasta aprobacion institucional. Raw payload y datos sensibles no deben publicarse.</span>
       </div>
 
-      <div className="card p-5 grid lg:grid-cols-[1fr_180px_180px_180px] gap-3">
+      <div className="card p-5 grid lg:grid-cols-[1fr_180px_180px_180px_180px] gap-3">
+        <input className="input" name="sourceName" value={filters.sourceName} onChange={updateFilter} placeholder="Filtrar por fuente" />
         <select className="input" name="recordType" value={filters.recordType} onChange={updateFilter}>
           {recordTypes.map((type) => <option key={type} value={type}>{type || "Todos los tipos"}</option>)}
         </select>
@@ -169,6 +203,20 @@ export default function InstitutionalIngestionReview() {
           <Play size={18} /> Ejecutar
         </button>
       </div>
+
+      <section className="card p-5 space-y-4">
+        <div>
+          <h2 className="font-black text-lg">Cómo cargar personas reales</h2>
+          <p className="text-sm text-slate-600">Descarga una plantilla, completa solo datos verificados por tu institucion, sube el CSV y usa Importar y dejar pendiente de revisión. No incluyas datos sensibles innecesarios.</p>
+        </div>
+        <div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-2">
+          {csvTemplates.map((template) => (
+            <a key={template} className="btn bg-white border border-slate-200 text-slate-800 flex items-center justify-center gap-2" href={`/templates/${template}`} download>
+              <Download size={16} /> {template}
+            </a>
+          ))}
+        </div>
+      </section>
 
       <section className="card p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -204,8 +252,11 @@ export default function InstitutionalIngestionReview() {
         <section className="space-y-3">
           {records.length > 0 && (
             <div className="card p-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-slate-700">{selectedRecords.length} seleccionados</p>
-              <button className="btn bg-rescueGreen text-white flex items-center gap-2" onClick={approveSelected}><CheckCircle size={17} /> Aprobar seleccionados</button>
+              <p className="text-sm font-semibold text-slate-700">{selectedRecords.length} seleccionados / {records.length} filtrados visibles</p>
+              <div className="flex flex-wrap gap-2">
+                <button className="btn bg-rescueGreen text-white flex items-center gap-2" onClick={approveSelected}><CheckCircle size={17} /> Aprobar seleccionados</button>
+                <button className="btn bg-blue-700 text-white flex items-center gap-2" onClick={approveFiltered}><CheckCircle size={17} /> Aprobar todos los filtrados</button>
+              </div>
             </div>
           )}
           {records.map((record) => (

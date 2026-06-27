@@ -25,6 +25,28 @@ function publicRecord(record) {
   };
 }
 
+const approvalResourceTypes = new Set([
+  "hospital",
+  "shelter",
+  "help_center",
+  "collection_center",
+  "water_point",
+  "food_point",
+  "medical_point",
+  "volunteer_center",
+  "donation_need",
+]);
+
+function buildRecordWhere(filters = {}) {
+  return {
+    deletedAt: null,
+    ...(filters.sourceName ? { sourceName: String(filters.sourceName) } : {}),
+    ...(filters.recordType ? { recordType: String(filters.recordType) } : {}),
+    ...(filters.verificationStatus ? { verificationStatus: String(filters.verificationStatus) } : {}),
+    ...(filters.possibleDuplicate ? { possibleDuplicate: filters.possibleDuplicate === "true" } : {}),
+  };
+}
+
 export const ingestionController = {
   run: asyncHandler(async (_req, res) => {
     const report = await HumanitarianImporter.run();
@@ -61,13 +83,7 @@ export const ingestionController = {
   }),
 
   records: asyncHandler(async (req, res) => {
-    const where = {
-      deletedAt: null,
-      ...(req.query.sourceName ? { sourceName: String(req.query.sourceName) } : {}),
-      ...(req.query.recordType ? { recordType: String(req.query.recordType) } : {}),
-      ...(req.query.verificationStatus ? { verificationStatus: String(req.query.verificationStatus) } : {}),
-      ...(req.query.possibleDuplicate ? { possibleDuplicate: req.query.possibleDuplicate === "true" } : {}),
-    };
+    const where = buildRecordWhere(req.query);
     const records = await prisma.importedHumanitarianRecord.findMany({
       where,
       orderBy: { capturedAt: "desc" },
@@ -92,6 +108,32 @@ export const ingestionController = {
     }
     const result = await prisma.importedHumanitarianRecord.updateMany({
       where: { id: { in: ids }, deletedAt: null },
+      data: { verificationStatus: "APROBADO", approvedAt: new Date(), reviewedById: req.user?.id },
+    });
+    res.json({ data: { approved: result.count } });
+  }),
+
+  approveFiltered: asyncHandler(async (req, res) => {
+    const filters = req.body?.filters || {};
+    const where = buildRecordWhere(filters);
+    const isResourceApproval = filters.recordType && approvalResourceTypes.has(filters.recordType);
+
+    if (!filters.recordType) {
+      res.status(400).json({
+        error: { message: "approve-filtered requires a resource recordType filter." },
+      });
+      return;
+    }
+
+    if (filters.recordType && !isResourceApproval) {
+      res.status(400).json({
+        error: { message: "Filtered bulk approval is limited to hospitals, shelters and resource records." },
+      });
+      return;
+    }
+
+    const result = await prisma.importedHumanitarianRecord.updateMany({
+      where,
       data: { verificationStatus: "APROBADO", approvedAt: new Date(), reviewedById: req.user?.id },
     });
     res.json({ data: { approved: result.count } });

@@ -29,12 +29,12 @@ async function ensureActiveAffectedZone(id) {
   return zone;
 }
 
-async function approvedImportedRecords(recordTypes) {
+async function approvedImportedRecords(recordTypes, take = 500) {
   try {
     const records = await prisma.importedHumanitarianRecord.findMany({
       where: { deletedAt: null, verificationStatus: "APROBADO", recordType: { in: recordTypes } },
       orderBy: { capturedAt: "desc" },
-      take: 100,
+      take,
     });
     return records.map((record) => ({ id: record.id, ...record.publicSafe }));
   } catch {
@@ -254,7 +254,7 @@ export const publicController = {
     const overview = await DashboardService.overview();
     const helpCenters = await approvedImportedRecords(publicCenterTypes);
     res.json({
-      stats: overview.stats,
+      stats: { ...overview.stats, activeCenters: overview.stats.activeCenters + helpCenters.length },
       latestEmergencies: overview.latestEmergencies.map(PublicDataSanitizer.emergency),
       helpCenters: helpCenters.slice(0, 12),
     });

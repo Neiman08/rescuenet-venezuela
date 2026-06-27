@@ -104,11 +104,13 @@ test("protected ingestion routes reject requests without token", async () => {
   const runResponse = await dispatch(createApp(), { method: "POST", url: "/api/ingestion/run" });
   const manualUploadResponse = await dispatch(createApp(), { method: "POST", url: "/api/ingestion/manual-upload", body: { records: [] } });
   const approveManyResponse = await dispatch(createApp(), { method: "POST", url: "/api/ingestion/records/approve-many", body: { ids: ["record-1"] } });
+  const approveFilteredResponse = await dispatch(createApp(), { method: "POST", url: "/api/ingestion/records/approve-filtered", body: { filters: { recordType: "hospital" } } });
 
   assert.equal(listResponse.statusCode, 401);
   assert.equal(runResponse.statusCode, 401);
   assert.equal(manualUploadResponse.statusCode, 401);
   assert.equal(approveManyResponse.statusCode, 401);
+  assert.equal(approveFilteredResponse.statusCode, 401);
 });
 
 test("protected ingestion routes require ingestion permission", async () => {
