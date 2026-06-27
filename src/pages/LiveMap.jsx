@@ -1,5 +1,6 @@
 import SectionTitle from "../components/SectionTitle";
 import MapPreview from "../components/MapPreview";
+import PublicAccessNotice from "../components/PublicAccessNotice";
 import StatusBadge from "../components/StatusBadge";
 import { affectedZones } from "../data/affectedZones";
 import { mapReports } from "../data/mockData";
@@ -9,6 +10,7 @@ export default function LiveMap() {
   return (
     <div className="space-y-6">
       <SectionTitle title="Mapa en vivo" subtitle="Zonas afectadas, radios de impacto y reportes operativos simulados." />
+      <PublicAccessNotice text="No necesitas crear cuenta para ver el mapa publico y ubicar ayuda cercana." />
       <div className="grid xl:grid-cols-[320px_1fr] gap-6">
         <aside className="card p-5 space-y-4">
           <h2 className="font-black text-lg">Filtros</h2>

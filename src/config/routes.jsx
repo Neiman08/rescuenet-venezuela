@@ -26,6 +26,7 @@ import GovernmentPanel from "../pages/GovernmentPanel";
 import HumanitarianLogistics from "../pages/HumanitarianLogistics";
 import InternationalPanel from "../pages/InternationalPanel";
 import LiveMap from "../pages/LiveMap";
+import Login from "../pages/Login";
 import MatchResults from "../pages/MatchResults";
 import PersonDetail from "../pages/PersonDetail";
 import PublishMissing from "../pages/PublishMissing";
@@ -41,6 +42,7 @@ import { permissions } from "../security/accessControl";
 
 export const appRoutes = [
   { path: "/", label: "Inicio", navLabel: "Inicio", icon: LayoutDashboard, element: <Dashboard />, permission: permissions.VIEW_PUBLIC_DASHBOARD, priority: "public" },
+  { path: "/login", label: "Acceso institucional", element: <Login />, permission: permissions.VIEW_PUBLIC_DASHBOARD, priority: "public" },
   { path: "/mapa", label: "Mapa en vivo", navLabel: "Mapa", icon: Map, element: <LiveMap />, permission: permissions.VIEW_PUBLIC_DASHBOARD, priority: "operational" },
   { path: "/operaciones", label: "Centro de operaciones", navLabel: "Operaciones", icon: Radio, element: <EmergencyOperations />, permission: permissions.MANAGE_RESPONDERS, priority: "critical" },
   { path: "/reportar", label: "Reportar emergencia", navLabel: "Reportar", icon: Siren, element: <ReportEmergency />, permission: permissions.REPORT_EMERGENCY, priority: "critical" },

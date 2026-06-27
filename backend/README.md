@@ -49,6 +49,20 @@ npm run seed
 - `GET /api/map`
 - `GET /api/logistics`
 - `POST /api/uploads`
+- `POST /api/emergency` public, no login
+- `GET /api/emergency/public`
+- `POST /api/safe` public, no login
+- `GET /api/safe/public`
+- `POST /api/missing` public, no login
+- `GET /api/missing/public`
+- `GET /api/rescued/public`
+- `GET /api/hospitals/public`
+- `GET /api/shelters/public`
+- `GET /api/map/public`
+- `GET /api/dashboard/public`
+- `GET /api/organizations/public`
+- `GET /api/donations/public`
+- `GET /api/help-centers/public`
 
 ## Notes
 
@@ -56,3 +70,5 @@ npm run seed
 - `.env.example` contains required environment variables.
 - Operational roles are enforced through JWT plus `requireRole()` and `requirePermission()`.
 - Elevated roles must not be self-registered; they should be assigned by an administrator workflow.
+- Victims, families, and citizens can report emergencies, safe status, missing people, and consult public help data without login.
+- Public responses must pass through `PublicDataSanitizer` before leaving the API.

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { HandCoins, ReceiptText } from "lucide-react";
 import DataTable from "../components/DataTable";
+import PublicAccessNotice from "../components/PublicAccessNotice";
 import SectionTitle from "../components/SectionTitle";
 import StatCard from "../components/StatCard";
 import { chartByZone, donations, expenses, stats } from "../data/mockData";
@@ -10,6 +11,7 @@ export default function DonationsOverview() {
   return (
     <div className="space-y-6">
       <SectionTitle title="Donaciones auditables" subtitle="Panel publico con fondos recibidos, gastos, evidencias y beneficiarios estimados." action={<Link to="/gastos" className="btn bg-navy text-white">Ver gastos</Link>} />
+      <PublicAccessNotice text="No necesitas crear cuenta para consultar donaciones publicas y auditoria resumida." />
       <div className="grid md:grid-cols-4 gap-4">
         <StatCard title="Total recibido" value={`$${stats.donationsReceived.toLocaleString()}`} color="green" icon={<HandCoins />} />
         <StatCard title="Total gastado" value={`$${stats.donationsSpent.toLocaleString()}`} color="orange" icon={<ReceiptText />} />

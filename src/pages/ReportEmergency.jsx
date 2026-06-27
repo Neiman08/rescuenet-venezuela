@@ -1,4 +1,5 @@
 import { Building2, Car, Droplet, HeartPulse, Home, Pill, Siren, UserRound, Utensils } from "lucide-react";
+import PublicAccessNotice from "../components/PublicAccessNotice";
 import SectionTitle from "../components/SectionTitle";
 import { affectedZones } from "../data/affectedZones";
 import { emergencyTypes } from "../data/mockData";
@@ -9,6 +10,7 @@ export default function ReportEmergency() {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <SectionTitle title="Reportar emergencia" subtitle="Este reporte sera enviado a equipos de rescate y centros de coordinacion." />
+      <PublicAccessNotice />
       <div className="card p-6">
         <h2 className="font-black text-lg mb-4">Tipo de emergencia</h2>
         <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -34,7 +36,7 @@ export default function ReportEmergency() {
         <input className="input" placeholder="Numero de personas afectadas" />
         <input className="input" type="file" />
         <textarea className="input md:col-span-2 min-h-32" placeholder="Descripcion de la emergencia" />
-        <button className="btn bg-rescueRed text-white md:col-span-2">Enviar reporte de emergencia</button>
+        <button className="btn bg-rescueRed text-white md:col-span-2">Enviar reporte urgente</button>
       </div>
     </div>
   );

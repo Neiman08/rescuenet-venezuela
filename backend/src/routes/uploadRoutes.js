@@ -8,8 +8,7 @@ import { asyncHandler } from "../utils/AppError.js";
 
 const router = Router();
 
-router.post(
-  "/",
+const privateUploadHandlers = [
   authenticate,
   requirePermission(PERMISSIONS.EMERGENCY_WRITE),
   uploadMiddleware.array("files", 6),
@@ -20,6 +19,9 @@ router.post(
     );
     res.status(201).json({ data: files });
   }),
-);
+];
+
+router.post("/", ...privateUploadHandlers);
+router.post("/private", ...privateUploadHandlers);
 
 export default router;

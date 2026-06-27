@@ -171,11 +171,15 @@ model EmergencyReport {
   id             String          @id @default(uuid())
   code           String          @unique
   reporterId     String?
+  reporterType   String          @default("authenticated")
+  reporterIp     String?
+  userAgent      String?
   affectedZoneId String
   type           String
   description    String
   priority       Priority        @default(MEDIA)
   status         EmergencyStatus @default(RECEPCION)
+  verificationStatus String       @default("pending_review")
   peopleAffected Int             @default(0)
   publicLocation String
   exactLocation  String?
@@ -199,6 +203,10 @@ model EmergencyReport {
 model SafeReport {
   id             String       @id @default(uuid())
   userId         String?
+  reporterType   String       @default("authenticated")
+  reporterIp     String?
+  userAgent      String?
+  verificationStatus String    @default("self_reported")
   affectedZoneId String
   fullName       String
   phone          String?
@@ -216,6 +224,12 @@ model SafeReport {
 model MissingPersonReport {
   id             String        @id @default(uuid())
   reporterId     String?
+  reporterType   String        @default("authenticated")
+  reporterIp     String?
+  userAgent      String?
+  verificationStatus String     @default("pending_review")
+  privacyLevel   String        @default("standard")
+  isMinor        Boolean       @default(false)
   affectedZoneId String
   fullName       String
   age            Int?

@@ -1,0 +1,229 @@
+import { z } from "zod";
+import { prisma } from "../config/prisma.js";
+import { DashboardService } from "../services/DashboardService.js";
+import { MapService } from "../services/MapService.js";
+import { PublicDataSanitizer } from "../services/PublicDataSanitizer.js";
+import { AuditService } from "../services/AuditService.js";
+import { asyncHandler } from "../utils/AppError.js";
+
+const publicMeta = (req) => ({
+  reporterType: "public",
+  reporterIp: req.ip,
+  userAgent: req.get("user-agent"),
+});
+
+function makeCode(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+}
+
+function withoutAntiSpamFields(payload) {
+  const body = { ...payload };
+  delete body.website;
+  delete body.url;
+  return body;
+}
+
+export const publicSchemas = {
+  emergency: z.object({
+    body: z.object({
+      affectedZoneId: z.string().min(1),
+      type: z.string().min(2),
+      description: z.string().min(5),
+      peopleAffected: z.coerce.number().int().min(0).default(0),
+      publicLocation: z.string().min(2),
+      exactLocation: z.string().optional(),
+      lat: z.coerce.number().optional(),
+      lng: z.coerce.number().optional(),
+      website: z.string().optional(),
+      url: z.string().optional(),
+    }),
+  }),
+  safe: z.object({
+    body: z.object({
+      affectedZoneId: z.string().min(1),
+      fullName: z.string().min(2),
+      phone: z.string().optional(),
+      currentPlace: z.string().min(2),
+      message: z.string().optional(),
+      website: z.string().optional(),
+      url: z.string().optional(),
+    }),
+  }),
+  missing: z.object({
+    body: z.object({
+      affectedZoneId: z.string().min(1),
+      fullName: z.string().min(2),
+      age: z.coerce.number().int().min(0).max(130).optional(),
+      documentId: z.string().optional(),
+      sex: z.string().optional(),
+      description: z.string().optional(),
+      clothing: z.string().optional(),
+      lastSeenPlace: z.string().optional(),
+      consentPublic: z.boolean().default(false),
+      isMinor: z.boolean().default(false),
+      website: z.string().optional(),
+      url: z.string().optional(),
+    }),
+  }),
+};
+
+export const publicController = {
+  createEmergency: asyncHandler(async (req, res) => {
+    const body = withoutAntiSpamFields(req.validated.body);
+    const emergency = await prisma.emergencyReport.create({
+      data: {
+        ...body,
+        ...publicMeta(req),
+        code: makeCode("EMG"),
+        source: "public_web_form",
+        verificationStatus: "pending_review",
+        priority: "MEDIA",
+      },
+      include: { affectedZone: true },
+    });
+    await AuditService.record({
+      action: "public_submission",
+      module: "emergency",
+      result: "SUCCESS",
+      ip: req.ip,
+      metadata: { code: emergency.code, captcha: req.captcha },
+    });
+    req.app.get("io")?.emit("emergency_created", PublicDataSanitizer.emergency(emergency));
+    res.status(201).json({ data: PublicDataSanitizer.emergency(emergency) });
+  }),
+
+  listPublicEmergencies: asyncHandler(async (_req, res) => {
+    const records = await prisma.emergencyReport.findMany({
+      where: { deletedAt: null },
+      include: { affectedZone: true },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    res.json({ data: records.map(PublicDataSanitizer.emergency) });
+  }),
+
+  createSafeReport: asyncHandler(async (req, res) => {
+    const body = withoutAntiSpamFields(req.validated.body);
+    const safeReport = await prisma.safeReport.create({
+      data: {
+        ...body,
+        ...publicMeta(req),
+        verificationStatus: "self_reported",
+      },
+      include: { affectedZone: true },
+    });
+    await AuditService.record({
+      action: "public_submission",
+      module: "safe",
+      result: "SUCCESS",
+      ip: req.ip,
+      metadata: { id: safeReport.id, captcha: req.captcha },
+    });
+    res.status(201).json({ data: PublicDataSanitizer.safeReport(safeReport) });
+  }),
+
+  listPublicSafeReports: asyncHandler(async (_req, res) => {
+    const records = await prisma.safeReport.findMany({
+      where: { deletedAt: null },
+      include: { affectedZone: true },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    res.json({ data: records.map(PublicDataSanitizer.safeReport) });
+  }),
+
+  createMissingReport: asyncHandler(async (req, res) => {
+    const body = withoutAntiSpamFields(req.validated.body);
+    const missing = await prisma.missingPersonReport.create({
+      data: {
+        ...body,
+        ...publicMeta(req),
+        verificationStatus: "pending_review",
+        privacyLevel: body.isMinor ? "restricted" : "standard",
+      },
+      include: { affectedZone: true },
+    });
+    await AuditService.record({
+      action: "public_submission",
+      module: "missing",
+      result: "SUCCESS",
+      ip: req.ip,
+      metadata: { id: missing.id, privacyLevel: missing.privacyLevel, captcha: req.captcha },
+    });
+    res.status(201).json({ data: PublicDataSanitizer.missing(missing) });
+  }),
+
+  listPublicMissing: asyncHandler(async (_req, res) => {
+    const records = await prisma.missingPersonReport.findMany({
+      where: { deletedAt: null },
+      include: { affectedZone: true },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    res.json({ data: records.map(PublicDataSanitizer.missing) });
+  }),
+
+  listPublicRescued: asyncHandler(async (_req, res) => {
+    const records = await prisma.rescuedPerson.findMany({
+      where: { deletedAt: null },
+      include: { affectedZone: true, hospital: true, shelter: true },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    res.json({ data: records.map(PublicDataSanitizer.rescued) });
+  }),
+
+  listPublicHospitals: asyncHandler(async (_req, res) => {
+    const records = await prisma.hospital.findMany({ where: { deletedAt: null }, include: { affectedZone: true }, take: 100 });
+    res.json({ data: records.map(PublicDataSanitizer.hospital) });
+  }),
+
+  listPublicShelters: asyncHandler(async (_req, res) => {
+    const records = await prisma.shelter.findMany({ where: { deletedAt: null }, include: { affectedZone: true }, take: 100 });
+    res.json({ data: records.map(PublicDataSanitizer.shelter) });
+  }),
+
+  publicDashboard: asyncHandler(async (_req, res) => {
+    const overview = await DashboardService.overview();
+    res.json({
+      stats: overview.stats,
+      latestEmergencies: overview.latestEmergencies.map(PublicDataSanitizer.emergency),
+    });
+  }),
+
+  publicMap: asyncHandler(async (_req, res) => {
+    const map = await MapService.liveMap();
+    res.json({
+      zones: map.zones,
+      reports: map.reports.map(PublicDataSanitizer.emergency),
+      shelters: map.shelters.map(PublicDataSanitizer.shelter),
+      hospitals: map.hospitals.map(PublicDataSanitizer.hospital),
+    });
+  }),
+
+  listPublicOrganizations: asyncHandler(async (_req, res) => {
+    const records = await prisma.organization.findMany({ where: { deletedAt: null, status: "VERIFICADA" }, take: 100 });
+    res.json({ data: records.map(PublicDataSanitizer.organization) });
+  }),
+
+  listPublicDonations: asyncHandler(async (_req, res) => {
+    const records = await prisma.donation.findMany({
+      where: { deletedAt: null },
+      include: { organization: true, affectedZone: true },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    res.json({ data: records.map(PublicDataSanitizer.donation) });
+  }),
+
+  helpCenters: asyncHandler(async (_req, res) => {
+    const [hospitals, shelters] = await Promise.all([
+      prisma.hospital.findMany({ where: { deletedAt: null }, include: { affectedZone: true }, take: 100 }),
+      prisma.shelter.findMany({ where: { deletedAt: null }, include: { affectedZone: true }, take: 100 }),
+    ]);
+    res.json({
+      hospitals: hospitals.map(PublicDataSanitizer.hospital),
+      shelters: shelters.map(PublicDataSanitizer.shelter),
+    });
+  }),
+};

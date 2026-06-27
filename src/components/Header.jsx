@@ -1,6 +1,6 @@
+import { Link } from "react-router-dom";
 import { Bell, Menu, Search } from "lucide-react";
 import { affectedZones } from "../data/affectedZones";
-import { roleCatalog } from "../data/roles";
 
 export default function Header() {
   return (
@@ -22,18 +22,13 @@ export default function Header() {
             <option key={z.id}>{z.sector} - {z.estado}</option>
           ))}
         </select>
-        <select className="hidden xl:block input py-2 w-56" defaultValue="coordinador_rescate" aria-label="Rol operativo">
-          {roleCatalog.map((role) => (
-            <option key={role.id} value={role.id}>{role.label}</option>
-          ))}
-        </select>
         <button className="relative p-2 rounded-xl bg-slate-100" aria-label="Alertas">
           <Bell size={20} />
           <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
         </button>
-        <button className="hidden sm:block bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-semibold">
-          Iniciar sesion
-        </button>
+        <Link to="/login" className="hidden sm:block bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-semibold">
+          Acceso ONG / Instituciones
+        </Link>
       </div>
     </header>
   );

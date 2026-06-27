@@ -1,9 +1,13 @@
 import { Router } from "express";
+import publicRoutes from "./publicRoutes.js";
 import authRoutes from "./authRoutes.js";
 import dashboardRoutes from "./dashboardRoutes.js";
 import mapRoutes from "./mapRoutes.js";
 import logisticsRoutes from "./logisticsRoutes.js";
 import uploadRoutes from "./uploadRoutes.js";
+import adminRoutes from "./adminRoutes.js";
+import auditRoutes from "./auditRoutes.js";
+import importRoutes from "./importRoutes.js";
 import {
   donationRoutes,
   emergencyRoutes,
@@ -16,6 +20,7 @@ import {
 
 const router = Router();
 
+router.use(publicRoutes);
 router.use("/auth", authRoutes);
 router.use("/emergency", emergencyRoutes);
 router.use("/missing", missingRoutes);
@@ -28,5 +33,8 @@ router.use("/dashboard", dashboardRoutes);
 router.use("/map", mapRoutes);
 router.use("/logistics", logisticsRoutes);
 router.use("/uploads", uploadRoutes);
+router.use("/admin", adminRoutes);
+router.use("/audit", auditRoutes);
+router.use("/import", importRoutes);
 
 export default router;

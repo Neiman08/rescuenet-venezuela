@@ -1,4 +1,5 @@
 import DataTable from "../components/DataTable";
+import PublicAccessNotice from "../components/PublicAccessNotice";
 import SectionTitle from "../components/SectionTitle";
 import { centers } from "../data/mockData";
 
@@ -6,6 +7,7 @@ export default function Centers() {
   return (
     <div className="space-y-6">
       <SectionTitle title="Centros de ayuda" subtitle="Refugios, hospitales y centros de acopio vinculados a zonas afectadas." />
+      <PublicAccessNotice text="No necesitas crear cuenta para consultar refugios, hospitales o centros de ayuda." />
       <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-4">
         {centers.map((center) => (
           <div className="card p-5" key={center.name}>

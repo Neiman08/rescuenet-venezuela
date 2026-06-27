@@ -14,3 +14,4 @@
 - Phase 4 privacy, security, and audit hardening completed with reusable sensitive fields, protected exact coordinates, restricted rescue-location warning, and admin data-protection controls.
 - Phase 5 GIS and AI readiness completed with GIS layer registry, logistics corridors, AI pipeline contracts, AI safety rules, route, and validation.
 - Phase 6 backend and operational platform completed with Express, Prisma/PostgreSQL schema, JWT auth, permissions, REST API, Socket.IO, upload service, audit service, matching/dispatch engines, AI/GIS service architecture, and backend tests.
+- Phase 7 login-free emergency public access completed with explicit public routes, public submission metadata, sanitizer service, anti-spam/rate-limit guards, protected sensitive routes, institutional login messaging, and public UX notices.

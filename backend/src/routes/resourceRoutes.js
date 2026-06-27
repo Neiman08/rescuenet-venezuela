@@ -19,6 +19,7 @@ export function createResourceRouter({ model, readPermission, writePermission, m
   const readAuth = allowPublicRead ? optionalAuthenticate : authenticate;
 
   router.get("/", readAuth, requirePermission(readPermission), controller.list);
+  router.get("/:id/full", authenticate, requirePermission(readPermission), controller.get);
   router.get("/:id", readAuth, requirePermission(readPermission), controller.get);
   router.post("/", authenticate, requirePermission(writePermission), audit("create", module), withEvent(events || {}), controller.create);
   router.patch("/:id", authenticate, requirePermission(writePermission), audit("update", module), withEvent(events || {}), controller.update);
@@ -81,3 +82,13 @@ export const donationRoutes = createResourceRouter({
   events: { created: "donation_received", updated: "donation_updated" },
   allowPublicRead: true,
 });
+
+const donationController = crudController(new CrudService("donation"));
+donationRoutes.post(
+  "/verified",
+  authenticate,
+  requirePermission(PERMISSIONS.DONATIONS_WRITE),
+  audit("create_verified", "donations"),
+  withEvent({ created: "donation_received" }),
+  donationController.create,
+);
