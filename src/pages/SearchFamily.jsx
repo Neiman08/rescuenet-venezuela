@@ -14,39 +14,18 @@ export default function SearchFamily() {
   const [status, setStatus] = useState("loading");
 
   useEffect(() => {
-    Promise.allSettled([publicApi.getRescued(), publicApi.getMissingReports(), publicApi.getSafeReports()])
-      .then(([rescued, missing, safe]) => {
-        const nextRows = [];
-        if (rescued.status === "fulfilled") {
-          nextRows.push(...(rescued.value.data || []).map((item) => ({
-            id: item.code || item.id,
-            name: item.name || "Informacion protegida",
-            age: item.approximateAge || "No indicada",
-            rescuedAt: item.affectedZone ? `${item.affectedZone.sector}, ${item.affectedZone.state}` : "Zona no indicada",
-            status: item.status,
-            privacy: item.privacyLevel === "restricted" ? "Informacion protegida" : "Resumen publico",
-          })));
-        }
-        if (missing.status === "fulfilled") {
-          nextRows.push(...(missing.value.data || []).map((item) => ({
-            id: item.id,
-            name: item.fullName,
-            age: item.age || "No indicada",
-            rescuedAt: item.affectedZone ? `${item.affectedZone.sector}, ${item.affectedZone.state}` : item.lastSeenPlace,
-            status: item.verificationStatus,
-            privacy: item.privacyLevel === "restricted" ? "Informacion protegida" : "Busqueda publica",
-          })));
-        }
-        if (safe.status === "fulfilled") {
-          nextRows.push(...(safe.value.data || []).map((item) => ({
-            id: item.id,
-            name: item.fullName,
-            age: "Reportado a salvo",
-            rescuedAt: item.affectedZone ? `${item.affectedZone.sector}, ${item.affectedZone.state}` : item.currentPlace,
-            status: item.verificationStatus,
-            privacy: "Contacto protegido",
-          })));
-        }
+    publicApi.searchFamily()
+      .then((payload) => {
+        const nextRows = (payload.data || []).map((item) => ({
+          id: item.code || item.id,
+          name: item.name,
+          age: item.age,
+          rescuedAt: item.publicLocation,
+          status: item.status,
+          privacy: item.privacyLevel === "restricted" ? "Informacion protegida" : "Resumen publico",
+          type: item.type,
+          hospital: item.hospital || "No indicado",
+        }));
         if (nextRows.length) {
           setRows(nextRows);
           setStatus("success");
@@ -87,6 +66,7 @@ export default function SearchFamily() {
           { key: "age", label: "Edad" },
           { key: "rescuedAt", label: "Zona publica" },
           { key: "status", label: "Estado", badge: true },
+          { key: "type", label: "Tipo" },
           { key: "privacy", label: "Privacidad", render: (row) => (row.isMinor ? "Informacion protegida" : "Resumen publico") },
         ]}
         rows={filteredRows}

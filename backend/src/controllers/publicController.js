@@ -43,6 +43,44 @@ async function approvedImportedRecords(recordTypes) {
 }
 
 const publicCenterTypes = ["collection_center", "shelter", "hospital", "help_center", "water_point", "food_point", "medical_point", "volunteer_center", "donation_need"];
+const familySearchTypes = ["missing_person", "hospitalized_person", "trapped_person", "safe_person", "rescued_person"];
+
+function queryText(value) {
+  return String(value || "").trim();
+}
+
+function containsFilter(value) {
+  const text = queryText(value);
+  return text ? { contains: text, mode: "insensitive" } : undefined;
+}
+
+function affectedZoneFilter(state, municipality) {
+  if (!state && !municipality) return undefined;
+  return {
+    is: {
+      ...(state ? { state } : {}),
+      ...(municipality ? { municipality } : {}),
+    },
+  };
+}
+
+function familyResult(base) {
+  return {
+    id: base.id,
+    type: base.type,
+    code: base.code,
+    name: base.name || "Informacion protegida",
+    age: base.age || "No indicada",
+    sex: base.sex,
+    status: base.status || "Por verificar",
+    publicLocation: base.publicLocation || "Zona no indicada",
+    hospital: base.hospital,
+    source: base.source || "RescueNet",
+    privacyLevel: base.privacyLevel || "standard",
+    verificationStatus: base.verificationStatus,
+    updatedAt: base.updatedAt || base.createdAt,
+  };
+}
 
 export const publicSchemas = {
   emergency: z.object({
@@ -266,5 +304,158 @@ export const publicController = {
       shelters: shelters.map(PublicDataSanitizer.shelter),
       imported: await approvedImportedRecords(publicCenterTypes),
     });
+  }),
+
+  familySearch: asyncHandler(async (req, res) => {
+    const q = queryText(req.query.q);
+    const state = containsFilter(req.query.state);
+    const municipality = containsFilter(req.query.municipality);
+    const hospital = containsFilter(req.query.hospital);
+    const status = containsFilter(req.query.status);
+    const take = Math.min(Number(req.query.take) || 100, 200);
+
+    const zoneFilter = affectedZoneFilter(state, municipality);
+
+    const [missing, safe, rescued, hospitalAdmissions, imported] = await Promise.all([
+      prisma.missingPersonReport.findMany({
+        where: {
+          deletedAt: null,
+          ...(q ? { OR: [{ fullName: containsFilter(q) }, { description: containsFilter(q) }, { clothing: containsFilter(q) }, { lastSeenPlace: containsFilter(q) }] } : {}),
+          ...(status ? { verificationStatus: status } : {}),
+          ...(zoneFilter ? { affectedZone: zoneFilter } : {}),
+        },
+        include: { affectedZone: true },
+        orderBy: { createdAt: "desc" },
+        take,
+      }),
+      prisma.safeReport.findMany({
+        where: {
+          deletedAt: null,
+          ...(q ? { OR: [{ fullName: containsFilter(q) }, { currentPlace: containsFilter(q) }, { message: containsFilter(q) }] } : {}),
+          ...(status ? { verificationStatus: status } : {}),
+          ...(zoneFilter ? { affectedZone: zoneFilter } : {}),
+        },
+        include: { affectedZone: true },
+        orderBy: { createdAt: "desc" },
+        take,
+      }),
+      prisma.rescuedPerson.findMany({
+        where: {
+          deletedAt: null,
+          ...(q ? { OR: [{ name: containsFilter(q) }, { distinctiveMarks: containsFilter(q) }, { clothing: containsFilter(q) }, { conditionSummary: containsFilter(q) }] } : {}),
+          ...(status ? { status: String(req.query.status) } : {}),
+          ...(hospital ? { hospital: { name: hospital } } : {}),
+          ...(zoneFilter ? { affectedZone: zoneFilter } : {}),
+        },
+        include: { affectedZone: true, hospital: true, shelter: true },
+        orderBy: { createdAt: "desc" },
+        take,
+      }),
+      prisma.hospitalAdmission.findMany({
+        where: {
+          deletedAt: null,
+          verified: true,
+          ...(q ? { OR: [{ fullName: containsFilter(q) }, { patientStatus: containsFilter(q) }, { hospitalName: containsFilter(q) }] } : {}),
+          ...(state ? { state } : {}),
+          ...(municipality ? { municipality } : {}),
+          ...(hospital ? { hospitalName: hospital } : {}),
+          ...(status ? { patientStatus: status } : {}),
+        },
+        orderBy: { createdAt: "desc" },
+        take,
+      }),
+      prisma.importedHumanitarianRecord.findMany({
+        where: {
+          deletedAt: null,
+          verificationStatus: "APROBADO",
+          recordType: { in: familySearchTypes },
+          ...(q ? { OR: [{ fullName: containsFilter(q) }, { name: containsFilter(q) }, { description: containsFilter(q) }, { hospitalName: containsFilter(q) }, { zone: containsFilter(q) }] } : {}),
+          ...(state ? { state } : {}),
+          ...(municipality ? { municipality } : {}),
+          ...(hospital ? { hospitalName: hospital } : {}),
+          ...(status ? { status } : {}),
+        },
+        orderBy: { capturedAt: "desc" },
+        take,
+      }),
+    ]);
+
+    const results = [
+      ...missing.map((record) => {
+        const item = PublicDataSanitizer.missing(record);
+        return familyResult({
+          id: item.id,
+          type: "missing_person",
+          name: item.fullName,
+          age: item.age,
+          sex: item.sex,
+          status: item.verificationStatus,
+          publicLocation: item.lastSeenPlace,
+          source: "Reporte publico",
+          privacyLevel: item.privacyLevel,
+          createdAt: item.createdAt,
+        });
+      }),
+      ...safe.map((record) => {
+        const item = PublicDataSanitizer.safeReport(record);
+        return familyResult({
+          id: item.id,
+          type: "safe_person",
+          name: item.fullName,
+          age: "Reportado a salvo",
+          status: item.verificationStatus,
+          publicLocation: item.currentPlace,
+          source: "Reporte publico",
+          privacyLevel: "standard",
+          createdAt: item.createdAt,
+        });
+      }),
+      ...rescued.map((record) => {
+        const item = PublicDataSanitizer.rescued(record);
+        return familyResult({
+          id: item.id,
+          code: item.code,
+          type: "rescued_person",
+          name: item.name,
+          age: item.approximateAge,
+          sex: item.sex,
+          status: item.status,
+          publicLocation: item.affectedZone ? [item.affectedZone.sector, item.affectedZone.municipality, item.affectedZone.state].filter(Boolean).join(", ") : undefined,
+          hospital: item.hospital,
+          source: "Equipo de rescate",
+          privacyLevel: item.privacyLevel,
+          createdAt: item.createdAt,
+        });
+      }),
+      ...hospitalAdmissions.map((record) => familyResult({
+        id: record.id,
+        type: "hospitalized_person",
+        name: record.publicSafe?.fullName || record.publicSafe?.name || "Informacion protegida",
+        age: record.publicSafe?.approximateAge || record.approximateAge,
+        sex: record.publicSafe?.gender || record.gender,
+        status: record.publicSafe?.patientStatus || record.patientStatus || "Hospitalizado",
+        publicLocation: [record.municipality, record.state].filter(Boolean).join(", "),
+        hospital: record.publicSafe?.hospitalName || record.hospitalName,
+        source: record.source,
+        privacyLevel: "standard",
+        createdAt: record.createdAt,
+      })),
+      ...imported.map((record) => familyResult({
+        id: record.id,
+        type: record.recordType,
+        name: record.publicSafe?.fullName || record.publicSafe?.name || record.fullName,
+        age: record.publicSafe?.approximateAge || record.approximateAge,
+        sex: record.publicSafe?.gender || record.gender,
+        status: record.publicSafe?.status || record.status,
+        publicLocation: record.publicSafe?.currentPlace || record.publicSafe?.lastSeenPlace || record.publicSafe?.zone || record.zone,
+        hospital: record.publicSafe?.hospitalName || record.hospitalName,
+        source: record.sourceName,
+        privacyLevel: record.privacyLevel,
+        verificationStatus: record.verificationStatus,
+        updatedAt: record.updatedAt,
+      })),
+    ].slice(0, take);
+
+    res.json({ data: results, meta: { total: results.length } });
   }),
 };

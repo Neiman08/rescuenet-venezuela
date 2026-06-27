@@ -102,9 +102,11 @@ test("protected admin route rejects requests without token", async () => {
 test("protected ingestion routes reject requests without token", async () => {
   const listResponse = await dispatch(createApp(), { url: "/api/ingestion/records" });
   const runResponse = await dispatch(createApp(), { method: "POST", url: "/api/ingestion/run" });
+  const manualUploadResponse = await dispatch(createApp(), { method: "POST", url: "/api/ingestion/manual-upload", body: { records: [] } });
 
   assert.equal(listResponse.statusCode, 401);
   assert.equal(runResponse.statusCode, 401);
+  assert.equal(manualUploadResponse.statusCode, 401);
 });
 
 test("protected ingestion routes require ingestion permission", async () => {
@@ -186,5 +188,53 @@ test("public help centers endpoint exposes approved publicSafe centers only", as
     prisma.hospital.findMany = originalHospital;
     prisma.shelter.findMany = originalShelter;
     prisma.importedHumanitarianRecord.findMany = originalImported;
+  }
+});
+
+test("public family search consolidates safe public data without raw payload", async () => {
+  const originals = {
+    missing: prisma.missingPersonReport.findMany,
+    safe: prisma.safeReport.findMany,
+    rescued: prisma.rescuedPerson.findMany,
+    admissions: prisma.hospitalAdmission.findMany,
+    imported: prisma.importedHumanitarianRecord.findMany,
+  };
+  prisma.missingPersonReport.findMany = async () => [];
+  prisma.safeReport.findMany = async () => [];
+  prisma.rescuedPerson.findMany = async () => [];
+  prisma.hospitalAdmission.findMany = async () => [];
+  prisma.importedHumanitarianRecord.findMany = async () => [{
+    id: "imported-person-1",
+    recordType: "missing_person",
+    fullName: "Nombre interno",
+    approximateAge: "12",
+    status: "desaparecida",
+    zone: "Los Teques",
+    privacyLevel: "restricted",
+    verificationStatus: "APROBADO",
+    publicSafe: {
+      fullName: "Informacion protegida",
+      approximateAge: "Menor de edad",
+      status: "desaparecida",
+      zone: "Los Teques",
+    },
+    rawPayload: { telefono: "04121234567", documento: "V-12345678" },
+    updatedAt: new Date(),
+  }];
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/family-search/public?q=Los%20Teques" });
+    assert.equal(response.statusCode, 200);
+    const body = response._getJSONData();
+    assert.equal(body.data[0].name, "Informacion protegida");
+    assert.equal(body.data[0].rawPayload, undefined);
+    assert.equal(JSON.stringify(body).includes("0412"), false);
+    assert.equal(JSON.stringify(body).includes("V-12345678"), false);
+  } finally {
+    prisma.missingPersonReport.findMany = originals.missing;
+    prisma.safeReport.findMany = originals.safe;
+    prisma.rescuedPerson.findMany = originals.rescued;
+    prisma.hospitalAdmission.findMany = originals.admissions;
+    prisma.importedHumanitarianRecord.findMany = originals.imported;
   }
 });

@@ -20,5 +20,6 @@ router.get("/dashboard/public", publicController.publicDashboard);
 router.get("/organizations/public", publicController.listPublicOrganizations);
 router.get("/donations/public", publicController.listPublicDonations);
 router.get("/help-centers/public", publicController.helpCenters);
+router.get("/family-search/public", publicController.familySearch);
 
 export default router;
