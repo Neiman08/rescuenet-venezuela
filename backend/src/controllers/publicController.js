@@ -4,7 +4,7 @@ import { DashboardService } from "../services/DashboardService.js";
 import { MapService } from "../services/MapService.js";
 import { PublicDataSanitizer } from "../services/PublicDataSanitizer.js";
 import { AuditService } from "../services/AuditService.js";
-import { asyncHandler } from "../utils/AppError.js";
+import { AppError, asyncHandler } from "../utils/AppError.js";
 
 const publicMeta = (req) => ({
   reporterType: "public",
@@ -21,6 +21,25 @@ function withoutAntiSpamFields(payload) {
   delete body.website;
   delete body.url;
   return body;
+}
+
+async function ensureActiveAffectedZone(id) {
+  const zone = await prisma.affectedZone.findFirst({ where: { id, deletedAt: null } });
+  if (!zone) throw new AppError("Affected zone is not available for public reporting", 400, "INVALID_AFFECTED_ZONE");
+  return zone;
+}
+
+async function approvedImportedRecords(recordTypes) {
+  try {
+    const records = await prisma.importedHumanitarianRecord.findMany({
+      where: { deletedAt: null, verificationStatus: "APROBADO", recordType: { in: recordTypes } },
+      orderBy: { capturedAt: "desc" },
+      take: 100,
+    });
+    return records.map((record) => ({ id: record.id, ...record.publicSafe }));
+  } catch {
+    return [];
+  }
 }
 
 export const publicSchemas = {
@@ -70,6 +89,7 @@ export const publicSchemas = {
 export const publicController = {
   createEmergency: asyncHandler(async (req, res) => {
     const body = withoutAntiSpamFields(req.validated.body);
+    await ensureActiveAffectedZone(body.affectedZoneId);
     const emergency = await prisma.emergencyReport.create({
       data: {
         ...body,
@@ -104,6 +124,7 @@ export const publicController = {
 
   createSafeReport: asyncHandler(async (req, res) => {
     const body = withoutAntiSpamFields(req.validated.body);
+    await ensureActiveAffectedZone(body.affectedZoneId);
     const safeReport = await prisma.safeReport.create({
       data: {
         ...body,
@@ -129,11 +150,13 @@ export const publicController = {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
-    res.json({ data: records.map(PublicDataSanitizer.safeReport) });
+    const imported = await approvedImportedRecords(["safe_person"]);
+    res.json({ data: [...records.map(PublicDataSanitizer.safeReport), ...imported] });
   }),
 
   createMissingReport: asyncHandler(async (req, res) => {
     const body = withoutAntiSpamFields(req.validated.body);
+    await ensureActiveAffectedZone(body.affectedZoneId);
     const missing = await prisma.missingPersonReport.create({
       data: {
         ...body,
@@ -160,7 +183,8 @@ export const publicController = {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
-    res.json({ data: records.map(PublicDataSanitizer.missing) });
+    const imported = await approvedImportedRecords(["missing_person", "hospitalized_person", "trapped_person"]);
+    res.json({ data: [...records.map(PublicDataSanitizer.missing), ...imported] });
   }),
 
   listPublicRescued: asyncHandler(async (_req, res) => {
@@ -170,12 +194,14 @@ export const publicController = {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
-    res.json({ data: records.map(PublicDataSanitizer.rescued) });
+    const imported = await approvedImportedRecords(["rescued_person"]);
+    res.json({ data: [...records.map(PublicDataSanitizer.rescued), ...imported] });
   }),
 
   listPublicHospitals: asyncHandler(async (_req, res) => {
     const records = await prisma.hospital.findMany({ where: { deletedAt: null }, include: { affectedZone: true }, take: 100 });
-    res.json({ data: records.map(PublicDataSanitizer.hospital) });
+    const imported = await approvedImportedRecords(["hospital", "hospitalized_person"]);
+    res.json({ data: [...records.map(PublicDataSanitizer.hospital), ...imported] });
   }),
 
   listPublicShelters: asyncHandler(async (_req, res) => {
@@ -194,11 +220,19 @@ export const publicController = {
   publicMap: asyncHandler(async (_req, res) => {
     const map = await MapService.liveMap();
     res.json({
-      zones: map.zones,
+      zones: map.zones.map(PublicDataSanitizer.affectedZone),
       reports: map.reports.map(PublicDataSanitizer.emergency),
       shelters: map.shelters.map(PublicDataSanitizer.shelter),
       hospitals: map.hospitals.map(PublicDataSanitizer.hospital),
     });
+  }),
+
+  listPublicAffectedZones: asyncHandler(async (_req, res) => {
+    const zones = await prisma.affectedZone.findMany({
+      where: { deletedAt: null },
+      orderBy: [{ level: "asc" }, { state: "asc" }, { municipality: "asc" }, { sector: "asc" }],
+    });
+    res.json({ data: zones.map(PublicDataSanitizer.affectedZone) });
   }),
 
   listPublicOrganizations: asyncHandler(async (_req, res) => {
@@ -224,6 +258,7 @@ export const publicController = {
     res.json({
       hospitals: hospitals.map(PublicDataSanitizer.hospital),
       shelters: shelters.map(PublicDataSanitizer.shelter),
+      imported: await approvedImportedRecords(["hospital", "shelter", "help_center", "emergency_phone"]),
     });
   }),
 };

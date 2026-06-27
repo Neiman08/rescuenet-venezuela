@@ -1,15 +1,34 @@
+import { useEffect, useState } from "react";
 import DataTable from "../components/DataTable";
 import PublicAccessNotice from "../components/PublicAccessNotice";
 import SectionTitle from "../components/SectionTitle";
 import { centers } from "../data/mockData";
+import { publicApi } from "../lib/api";
 
 export default function Centers() {
+  const [rows, setRows] = useState(centers);
+  const [status, setStatus] = useState("loading");
+
+  useEffect(() => {
+    publicApi.getHelpCenters()
+      .then((payload) => {
+        const nextRows = [
+          ...(payload.hospitals || []).map((item) => ({ ...item, type: "Hospital", zone: item.affectedZone?.sector || "Zona no indicada" })),
+          ...(payload.shelters || []).map((item) => ({ ...item, type: "Refugio", zone: item.affectedZone?.sector || "Zona no indicada" })),
+        ];
+        if (nextRows.length) setRows(nextRows);
+        setStatus("success");
+      })
+      .catch(() => setStatus("fallback"));
+  }, []);
+
   return (
     <div className="space-y-6">
       <SectionTitle title="Centros de ayuda" subtitle="Refugios, hospitales y centros de acopio vinculados a zonas afectadas." />
       <PublicAccessNotice text="No necesitas crear cuenta para consultar refugios, hospitales o centros de ayuda." />
+      {status === "fallback" && <div className="rounded-2xl bg-yellow-50 p-4 text-sm font-semibold text-yellow-800">No pudimos conectar con centros publicos del backend. Mostrando datos simulados locales.</div>}
       <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-4">
-        {centers.map((center) => (
+        {rows.map((center) => (
           <div className="card p-5" key={center.name}>
             <h2 className="font-black">{center.name}</h2>
             <p className="text-sm text-slate-500">{center.type} - {center.zone}</p>
@@ -27,7 +46,7 @@ export default function Centers() {
         { key: "capacity", label: "Capacidad" },
         { key: "occupied", label: "Ocupados" },
         { key: "status", label: "Estado", badge: true },
-      ]} rows={centers} />
+      ]} rows={rows} />
     </div>
   );
 }

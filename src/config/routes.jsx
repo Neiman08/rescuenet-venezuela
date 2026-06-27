@@ -24,6 +24,7 @@ import EmergencyOperations from "../pages/EmergencyOperations";
 import Expenses from "../pages/Expenses";
 import GovernmentPanel from "../pages/GovernmentPanel";
 import HumanitarianLogistics from "../pages/HumanitarianLogistics";
+import InstitutionalIngestionReview from "../pages/InstitutionalIngestionReview";
 import InternationalPanel from "../pages/InternationalPanel";
 import LiveMap from "../pages/LiveMap";
 import Login from "../pages/Login";
@@ -65,6 +66,7 @@ export const appRoutes = [
   { path: "/internacional", label: "Internacional", navLabel: "Global", icon: Globe2, element: <InternationalPanel />, permission: permissions.VIEW_INTERNATIONAL_PANEL, priority: "humanitarian" },
   { path: "/ia", label: "Arquitectura IA", navLabel: "IA", icon: BrainCircuit, element: <AIReadiness />, permission: permissions.ADMINISTER_AI, priority: "restricted" },
   { path: "/admin", label: "Administracion", navLabel: "Admin", icon: Settings, element: <AdminVerification />, permission: permissions.ADMINISTER_SYSTEM, priority: "restricted" },
+  { path: "/admin/ingesta", label: "Ingesta institucional", element: <InstitutionalIngestionReview />, permission: permissions.ADMINISTER_SYSTEM, priority: "restricted" },
 ];
 
 export const navigationRoutes = appRoutes.filter((route) => route.icon);

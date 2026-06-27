@@ -1,5 +1,8 @@
 import { prisma } from "../config/prisma.js";
 import { PERMISSIONS, ROLE_PERMISSIONS } from "../auth/permissions.js";
+import { initialHospitals, initialShelters } from "../data/initialHelpCenters.js";
+import { venezuelaAffectedZones } from "../data/venezuelaAffectedZones.js";
+import { ingestionSources } from "../ingestion/sourcesRegistry.js";
 
 const roleLabels = {
   PUBLICO: "Publico",
@@ -39,8 +42,76 @@ export async function seedAccessControl() {
   }
 }
 
+export async function seedAffectedZones() {
+  for (const zone of venezuelaAffectedZones) {
+    await prisma.affectedZone.upsert({
+      where: { code: zone.code },
+      update: {
+        state: zone.state,
+        municipality: zone.municipality,
+        parish: zone.parish,
+        sector: zone.sector,
+        level: zone.level,
+        color: zone.color,
+        operationalStatus: zone.operationalStatus,
+        lat: zone.lat,
+        lng: zone.lng,
+        radiusKm: zone.radiusKm,
+        impacts: zone.impacts,
+        verification: "VERIFICADA",
+        deletedAt: null,
+      },
+      create: {
+        ...zone,
+        verification: "VERIFICADA",
+      },
+    });
+  }
+}
+
+export async function seedIngestionSources() {
+  for (const source of ingestionSources) {
+    await prisma.ingestionSource.upsert({
+      where: { name: source.name },
+      update: { url: source.url, type: source.type, trustLevel: source.trustLevel, enabled: source.enabled, deletedAt: null },
+      create: { name: source.name, url: source.url, type: source.type, trustLevel: source.trustLevel, enabled: source.enabled },
+    });
+  }
+}
+
+export async function seedInitialHelpCenters() {
+  for (const hospital of initialHospitals) {
+    const affectedZone = await prisma.affectedZone.findUnique({ where: { code: hospital.zoneCode } });
+    if (!affectedZone) continue;
+    const existing = await prisma.hospital.findFirst({ where: { name: hospital.name, affectedZoneId: affectedZone.id, deletedAt: null } });
+    if (existing) {
+      await prisma.hospital.update({ where: { id: existing.id }, data: { capacity: hospital.capacity, occupied: hospital.occupied, status: hospital.status } });
+    } else {
+      await prisma.hospital.create({ data: { affectedZoneId: affectedZone.id, name: hospital.name, capacity: hospital.capacity, occupied: hospital.occupied, status: hospital.status } });
+    }
+  }
+
+  for (const shelter of initialShelters) {
+    const affectedZone = await prisma.affectedZone.findUnique({ where: { code: shelter.zoneCode } });
+    if (!affectedZone) continue;
+    const existing = await prisma.shelter.findFirst({ where: { name: shelter.name, affectedZoneId: affectedZone.id, deletedAt: null } });
+    if (existing) {
+      await prisma.shelter.update({ where: { id: existing.id }, data: { capacity: shelter.capacity, occupied: shelter.occupied, status: shelter.status } });
+    } else {
+      await prisma.shelter.create({ data: { affectedZoneId: affectedZone.id, name: shelter.name, capacity: shelter.capacity, occupied: shelter.occupied, status: shelter.status } });
+    }
+  }
+}
+
+export async function seedMinimumOperationalData() {
+  await seedAccessControl();
+  await seedAffectedZones();
+  await seedIngestionSources();
+  await seedInitialHelpCenters();
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
-  seedAccessControl()
-    .then(() => console.log("Access control seeded"))
+  seedMinimumOperationalData()
+    .then(() => console.log("Minimum operational data seeded"))
     .finally(() => prisma.$disconnect());
 }

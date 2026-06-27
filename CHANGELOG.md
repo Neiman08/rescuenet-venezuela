@@ -15,3 +15,9 @@
 - Phase 5 GIS and AI readiness completed with GIS layer registry, logistics corridors, AI pipeline contracts, AI safety rules, route, and validation.
 - Phase 6 backend and operational platform completed with Express, Prisma/PostgreSQL schema, JWT auth, permissions, REST API, Socket.IO, upload service, audit service, matching/dispatch engines, AI/GIS service architecture, and backend tests.
 - Phase 7 login-free emergency public access completed with explicit public routes, public submission metadata, sanitizer service, anti-spam/rate-limit guards, protected sensitive routes, institutional login messaging, and public UX notices.
+
+### In Progress
+
+- Phase 8 public operations hardening started with official affected-zone seed data, sanitized public zone endpoint, frontend form zone loading, emergency public-location sanitization, and protected raw donation CRUD.
+- Added protected humanitarian ingestion foundation with source registry, scrapers/connectors, normalizer, privacy service, deduplication service, importer CLI, Prisma models, protected API routes, public-safe integration, institutional review page, and tests.
+- Closed ingestion phase with a Postgres migration, real Excel parsing via `xlsx`, robust CLI flags, no-DB importable reports, initial hospital/shelter seed data, and expanded security/privacy tests.

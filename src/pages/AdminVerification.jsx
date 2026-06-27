@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import DataTable from "../components/DataTable";
 import SectionTitle from "../components/SectionTitle";
 import { auditLogs } from "../data/mockData";
@@ -6,6 +7,7 @@ import { permissions, rolePermissions } from "../security/accessControl";
 
 const tasks = [
   "Verificar reportes",
+  "Revisar ingesta institucional",
   "Aprobar ONG",
   "Bloquear fraude",
   "Revisar denuncias",
@@ -30,7 +32,11 @@ export default function AdminVerification() {
     <div className="space-y-6">
       <SectionTitle title="Administracion" subtitle="Centro mock de verificacion, roles, auditoria y control antifraude." />
       <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-4">
-        {tasks.map((task) => <button key={task} className="card p-4 text-left font-bold hover:border-blue-300">{task}</button>)}
+        {tasks.map((task) => (
+          task === "Revisar ingesta institucional"
+            ? <Link key={task} to="/admin/ingesta" className="card p-4 text-left font-bold hover:border-blue-300">{task}</Link>
+            : <button key={task} className="card p-4 text-left font-bold hover:border-blue-300">{task}</button>
+        ))}
       </div>
       <div className="grid xl:grid-cols-[360px_1fr] gap-6">
         <div className="card p-5">

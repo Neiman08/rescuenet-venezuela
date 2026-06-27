@@ -83,6 +83,17 @@ Status: Complete
 - Keep sensitive and operational endpoints protected for institutions, verified responders, government, auditors, and administrators.
 - Update frontend header, login page, public notices, and critical CTA copy.
 
+## Phase 8 - Public Operations Hardening
+
+Status: In Progress
+
+- Connect public forms to official backend affected-zone records instead of simulated IDs.
+- Add public affected-zone endpoint with sanitized approximate coordinates.
+- Seed the initial Venezuela affected-zone catalog for critical, high, and medium priority states.
+- Harden public emergency location sanitization and keep raw donation CRUD behind authentication.
+- Add humanitarian ingestion architecture for public-source discovery, normalization, privacy, deduplication, protected review, and CLI execution.
+- Continue with uploads, hospital admissions importers, real database migration review, and production CAPTCHA.
+
 ## Validation Policy
 
 After each phase:

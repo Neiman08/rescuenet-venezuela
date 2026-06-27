@@ -11,7 +11,24 @@ npm run build
 npm run lint
 npm test
 npm run seed
+npm run prisma:migrate
+npm run prisma:seed
+npm run prisma:generate
+npm run ingest:humanitarian
 ```
+
+## Humanitarian Ingestion CLI
+
+```bash
+npm run ingest:humanitarian -- --dry-run
+npm run ingest:humanitarian -- --source=redayuda
+npm run ingest:humanitarian -- --source=vzlayuda
+npm run ingest:humanitarian -- --file=/path/to/public-data.csv
+npm run ingest:humanitarian -- --file=/path/to/public-data.json
+npm run ingest:humanitarian -- --file=/path/to/public-data.xlsx
+```
+
+Reports are written to `backend/reports/ingestion/`. If PostgreSQL is unavailable or migrations are not applied, the command keeps running and writes an importable JSON report. Re-run after setting `DATABASE_URL`, then execute `npm run prisma:migrate`, `npm run prisma:seed`, and `npm run ingest:humanitarian`.
 
 ## Core Endpoints
 
@@ -58,17 +75,27 @@ npm run seed
 - `GET /api/rescued/public`
 - `GET /api/hospitals/public`
 - `GET /api/shelters/public`
+- `GET /api/affected-zones/public`
 - `GET /api/map/public`
 - `GET /api/dashboard/public`
 - `GET /api/organizations/public`
 - `GET /api/donations/public`
 - `GET /api/help-centers/public`
+- `POST /api/ingestion/run`
+- `GET /api/ingestion/runs`
+- `GET /api/ingestion/records`
+- `POST /api/ingestion/records/:id/approve`
+- `POST /api/ingestion/records/:id/reject`
+- `POST /api/ingestion/records/:id/mark-duplicate`
+- `POST /api/ingestion/records/:id/link-duplicate`
 
 ## Notes
 
 - PostgreSQL is configured through Prisma in `prisma/schema.prisma`.
 - `.env.example` contains required environment variables.
+- Run `npm run prisma:migrate` against a configured PostgreSQL database, then `npm run prisma:seed` to create roles, permissions, and the initial Venezuela affected-zone catalog.
 - Operational roles are enforced through JWT plus `requireRole()` and `requirePermission()`.
 - Elevated roles must not be self-registered; they should be assigned by an administrator workflow.
 - Victims, families, and citizens can report emergencies, safe status, missing people, and consult public help data without login.
 - Public responses must pass through `PublicDataSanitizer` before leaving the API.
+- Imported humanitarian records are stored as `NO_VERIFICADO` with `sourceUrl`, `capturedAt`, `rawPayload`, and `publicSafe`; only approved `publicSafe` records can be merged into public endpoints.

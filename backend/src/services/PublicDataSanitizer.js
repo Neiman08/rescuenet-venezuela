@@ -12,11 +12,45 @@ function zoneSummary(zone) {
     code: zone.code,
     state: zone.state,
     municipality: zone.municipality,
+    parish: zone.parish,
     sector: zone.sector,
     level: zone.level,
+    color: zone.color,
+    operationalStatus: zone.operationalStatus,
     radiusKm: zone.radiusKm,
     verification: zone.verification,
+    approximateLat: approximateCoordinate(zone.lat),
+    approximateLng: approximateCoordinate(zone.lng),
   };
+}
+
+function approximateCoordinate(value) {
+  if (value === undefined || value === null) return undefined;
+  return Number(Number(value).toFixed(2));
+}
+
+export function sanitizePublicPlaceText(place, zone) {
+  if (zone) {
+    return [zone.sector, zone.municipality, zone.state].filter(Boolean).join(", ");
+  }
+
+  if (!place) return undefined;
+
+  const text = String(place)
+    .replace(/[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?)[,\s]+[-+]?(1[0-7]\d(\.\d+)?|[1-9]?\d(\.\d+)?|180(\.0+)?)/g, "")
+    .replace(/\+?\d[\d\s().-]{6,}\d/g, "")
+    .replace(/\b(V|E|J|G)?-?\d{6,10}\b/gi, "")
+    .replace(/\b(calle|av\.?|avenida|carrera|vereda|edificio|torre|piso|apartamento|apto|casa|numero|nro|#)\b.*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!text || text.length < 3) return "Zona general protegida";
+
+  const parts = text.split(/[,;-]/).map((part) => part.trim()).filter(Boolean);
+  const general = parts.slice(-2).join(", ") || parts[0];
+
+  if (/\d/.test(general) || general.length > 80) return "Zona general protegida";
+  return general;
 }
 
 export class PublicDataSanitizer {
@@ -28,7 +62,7 @@ export class PublicDataSanitizer {
       priority: report.priority,
       status: report.status,
       peopleAffected: report.peopleAffected,
-      publicLocation: report.publicLocation,
+      publicLocation: sanitizePublicPlaceText(report.publicLocation, report.affectedZone),
       source: report.source,
       verificationStatus: report.verificationStatus,
       affectedZone: zoneSummary(report.affectedZone),
@@ -41,8 +75,7 @@ export class PublicDataSanitizer {
       id: report.id,
       fullName: report.fullName,
       phone: maskPhone(report.phone),
-      currentPlace: report.currentPlace,
-      message: report.message,
+      currentPlace: sanitizePublicPlaceText(report.currentPlace, report.affectedZone),
       verificationStatus: report.verificationStatus,
       affectedZone: zoneSummary(report.affectedZone),
       createdAt: report.createdAt,
@@ -57,7 +90,7 @@ export class PublicDataSanitizer {
       age: report.age,
       sex: report.sex,
       clothing: restricted ? undefined : report.clothing,
-      lastSeenPlace: restricted ? "Zona general protegida" : report.lastSeenPlace,
+      lastSeenPlace: sanitizePublicPlaceText(report.lastSeenPlace, report.affectedZone),
       privacyLevel: restricted ? "restricted" : report.privacyLevel,
       verificationStatus: report.verificationStatus,
       affectedZone: zoneSummary(report.affectedZone),
@@ -131,6 +164,14 @@ export class PublicDataSanitizer {
       organization: donation.organization?.name,
       affectedZone: zoneSummary(donation.affectedZone),
       createdAt: donation.createdAt,
+    };
+  }
+
+  static affectedZone(zone) {
+    return {
+      ...zoneSummary(zone),
+      approximateLat: approximateCoordinate(zone.lat),
+      approximateLng: approximateCoordinate(zone.lng),
     };
   }
 }

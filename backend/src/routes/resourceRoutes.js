@@ -80,7 +80,6 @@ export const donationRoutes = createResourceRouter({
   writePermission: PERMISSIONS.DONATIONS_WRITE,
   module: "donations",
   events: { created: "donation_received", updated: "donation_updated" },
-  allowPublicRead: true,
 });
 
 const donationController = crudController(new CrudService("donation"));

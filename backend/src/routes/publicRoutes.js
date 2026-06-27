@@ -14,6 +14,7 @@ router.get("/missing/public", publicController.listPublicMissing);
 router.get("/rescued/public", publicController.listPublicRescued);
 router.get("/hospitals/public", publicController.listPublicHospitals);
 router.get("/shelters/public", publicController.listPublicShelters);
+router.get("/affected-zones/public", publicController.listPublicAffectedZones);
 router.get("/map/public", publicController.publicMap);
 router.get("/dashboard/public", publicController.publicDashboard);
 router.get("/organizations/public", publicController.listPublicOrganizations);

@@ -10,7 +10,11 @@
     "lint": "node scripts/check-syntax.js",
     "build": "prisma generate",
     "test": "node --test",
-    "seed": "node src/prisma/seed.js"
+    "seed": "node src/prisma/seed.js",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "node src/prisma/seed.js",
+    "prisma:generate": "prisma generate",
+    "ingest:humanitarian": "node src/ingestion/runHumanitarianIngestion.js"
   },
   "dependencies": {
     "@prisma/client": "^6.18.0",
@@ -26,7 +30,10 @@
     "prisma": "^6.18.0",
     "socket.io": "^4.8.1",
     "uuid": "^13.0.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.1.12"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "node-mocks-http": "^1.17.2"
+  }
 }

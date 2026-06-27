@@ -8,6 +8,7 @@ import uploadRoutes from "./uploadRoutes.js";
 import adminRoutes from "./adminRoutes.js";
 import auditRoutes from "./auditRoutes.js";
 import importRoutes from "./importRoutes.js";
+import ingestionRoutes from "./ingestionRoutes.js";
 import {
   donationRoutes,
   emergencyRoutes,
@@ -36,5 +37,6 @@ router.use("/uploads", uploadRoutes);
 router.use("/admin", adminRoutes);
 router.use("/audit", auditRoutes);
 router.use("/import", importRoutes);
+router.use("/ingestion", ingestionRoutes);
 
 export default router;
