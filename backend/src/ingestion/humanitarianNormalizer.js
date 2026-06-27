@@ -22,6 +22,8 @@ const allowedTypes = new Set([
   "food_point",
   "medical_point",
   "volunteer_center",
+  "pet_aid_center",
+  "logistics_center",
 ]);
 
 function pick(raw, keys) {
@@ -66,7 +68,7 @@ export class HumanitarianNormalizer {
     let recordType = detectType(raw);
     const status = pick(raw, ["status", "estado", "condition"]);
     if (String(status || "").toLowerCase().includes("fallecid")) recordType = "deceased_person_private_only";
-    if (["collection_center", "shelter", "hospital", "help_center", "water_point", "food_point", "medical_point", "volunteer_center", "donation_need"].includes(recordType)) {
+    if (["collection_center", "shelter", "hospital", "help_center", "water_point", "food_point", "medical_point", "volunteer_center", "pet_aid_center", "logistics_center", "donation_need"].includes(recordType)) {
       return CollectionCenterNormalizer.normalize(raw, source);
     }
     const normalized = {
@@ -89,8 +91,8 @@ export class HumanitarianNormalizer {
       photoUrl: pick(raw, ["photoUrl", "photo", "foto", "image"]),
       contactInfoPrivate: pick(raw, ["contactInfoPrivate", "contact", "contacto", "telefono", "telefonos", "teléfonos", "phone"]),
       documentPrivate: privateObject(raw, ["documentPrivate", "cedula", "cédula", "documento", "documentNumber", "documentId"]),
-      medicalPrivate: privateObject(raw, ["medicalPrivate", "informacionMedica", "información médica", "medicalInfo", "alergias", "allergies"]),
-      locationPrivate: privateObject(raw, ["locationPrivate", "edificio", "piso", "apartamento", "direccion", "dirección", "address"]),
+      medicalPrivate: privateObject(raw, ["medicalPrivate", "informacionMedica", "información médica", "medicalInfo", "condition", "condicion", "diagnostico", "observations", "observaciones", "alergias", "allergies"]),
+      locationPrivate: privateObject(raw, ["locationPrivate", "edificio", "piso", "floor", "habitacion", "habitación", "room", "cama", "bed", "apartamento", "direccion", "dirección", "address"]),
       verificationStatus: "NO_VERIFICADO",
       privacyLevel: pick(raw, ["privacyLevel"]) || "standard",
       possibleDuplicate: false,

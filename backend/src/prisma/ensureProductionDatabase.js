@@ -32,13 +32,17 @@ async function bootstrapPublicPersonRegistry() {
       import("../ingestion/humanitarianImporter.js"),
       import("../ingestion/sourcesRegistry.js"),
     ]);
-    const sources = ingestionSources.filter((source) => source.name === "Rescate Venezuela");
+    const bootstrapSourceNames = new Set([
+      "Rescate Venezuela",
+      "SISMO 2026 VZLA - Google Drive Hospitales",
+    ]);
+    const sources = ingestionSources.filter((source) => bootstrapSourceNames.has(source.name));
     if (!sources.length) return;
 
     const report = await HumanitarianImporter.run({ sources, writeReport: false });
     const approved = await prisma.importedHumanitarianRecord.updateMany({
       where: {
-        sourceName: "Rescate Venezuela",
+        sourceName: { in: [...bootstrapSourceNames] },
         deletedAt: null,
         recordType: { in: ["missing_person", "hospitalized_person", "safe_person", "rescued_person", "trapped_person"] },
         privacyLevel: { not: "private_only" },
@@ -48,7 +52,7 @@ async function bootstrapPublicPersonRegistry() {
 
     console.log(JSON.stringify({
       message: "Public person registry bootstrap completed",
-      sourceName: "Rescate Venezuela",
+      sourceNames: [...bootstrapSourceNames],
       extracted: report.recordsExtracted,
       imported: report.recordsImported,
       updated: report.recordsUpdated,

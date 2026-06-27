@@ -12,6 +12,7 @@ import { HumanitarianNormalizer } from "../src/ingestion/humanitarianNormalizer.
 import { HumanitarianDeduplicationService } from "../src/ingestion/humanitarianDeduplicationService.js";
 import { IngestionPrivacyService } from "../src/ingestion/ingestionPrivacyService.js";
 import { isImportableHumanitarianRecord, isUsefulRawRecord } from "../src/ingestion/ingestionRecordQuality.js";
+import { extractDriveItems, parseHospitalAdmissionText } from "../src/ingestion/googleDriveHospitalAdmissionsConnector.js";
 import { fetchRescateVenezuela } from "../src/ingestion/rescateVenezuelaConnector.js";
 import { parseCliArgs } from "../src/ingestion/runHumanitarianIngestion.js";
 import { prisma } from "../src/config/prisma.js";
@@ -65,6 +66,58 @@ test("Rescate Venezuela connector parses public embedded JSON without exposing b
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("Google Drive hospital connector extracts Drive items and parses hospital admission text", () => {
+  const html = `
+    <div class="JxSEve" aria-label="Listado Google Docs Shared" data-id="doc-12345678901234567890" data-tooltip="Listado Google Docs">
+      <strong class="DNoYtb">Listado</strong>
+    </div>
+    <div class="JxSEve" aria-label="INGRESOS HOSPITALARIOS.pdf PDF Shared" data-id="pdf-12345678901234567890" data-tooltip="INGRESOS HOSPITALARIOS.pdf PDF">
+      <strong class="DNoYtb">INGRESOS HOSPITALARIOS.pdf</strong>
+    </div>`;
+  const items = extractDriveItems(html);
+  assert.equal(items.length, 2);
+  assert.equal(items[0].mimeType, "application/vnd.google-apps.document");
+  assert.equal(items[1].mimeType, "application/pdf");
+
+  const records = parseHospitalAdmissionText(`
+    N°\tHOSPITAL\tAPELLIDOS Y NOMBRES\tEDAD
+    1
+    Hospital Universitario de Caracas
+    PERSONA HOSPITALIZADA
+    35
+  `, { id: "doc-1", name: "Listado", url: "https://docs.google.com/document/d/doc-1/export?format=txt" });
+
+  assert.equal(records.length, 1);
+  assert.equal(records[0].recordType, "hospitalized_person");
+  assert.equal(records[0].hospitalName, "Hospital Universitario de Caracas");
+  assert.equal(records[0].fullName, "PERSONA HOSPITALIZADA");
+  assert.equal(records[0].approximateAge, "35");
+});
+
+test("Hospitalized records keep clinical/location details private and publicSafe safe", () => {
+  const record = HumanitarianNormalizer.normalize({
+    recordType: "hospitalized_person",
+    fullName: "Persona Hospitalizada",
+    approximateAge: "35",
+    hospitalName: "Hospital Universitario de Caracas",
+    cedula: "V-87654321",
+    condition: "Diagnostico sensible",
+    room: "402",
+    bed: "B",
+    floor: "4",
+    status: "Hospitalizado",
+  }, { name: "SISMO 2026 VZLA - Google Drive Hospitales", url: "https://drive.google.com" });
+
+  assert.equal(record.recordType, "hospitalized_person");
+  assert.equal(record.documentPrivate.cedula, "V-87654321");
+  assert.equal(record.medicalPrivate.condition, "Diagnostico sensible");
+  assert.equal(record.locationPrivate.room, "402");
+  assert.equal(record.publicSafe.hospitalName, "Hospital Universitario de Caracas");
+  assert.equal(JSON.stringify(record.publicSafe).includes("87654321"), false);
+  assert.equal(JSON.stringify(record.publicSafe).includes("Diagnostico sensible"), false);
+  assert.equal(JSON.stringify(record.publicSafe).includes("402"), false);
 });
 
 test("HumanitarianNormalizer marks deceased records as private-only", () => {
@@ -234,6 +287,7 @@ test("CLI parser supports all-persons real source group", () => {
   const options = parseCliArgs(["--source=all-persons"]);
   const names = options.sources.map((item) => item.name);
 
+  assert.equal(names.includes("SISMO 2026 VZLA - Google Drive Hospitales"), true);
   assert.equal(names.includes("Rescate Venezuela"), true);
   assert.equal(names.includes("Venezuela Te Busca"), true);
   assert.equal(names.includes("Desaparecidos Terremoto Venezuela"), true);
@@ -248,6 +302,13 @@ test("CLI parser supports Rescate Venezuela source filter", () => {
 
   assert.equal(options.sources.length, 1);
   assert.equal(options.sources[0].name, "Rescate Venezuela");
+});
+
+test("CLI parser supports Google Drive hospital source filter", () => {
+  const options = parseCliArgs(["--source=google-drive-hospitales"]);
+
+  assert.equal(options.sources.length, 1);
+  assert.equal(options.sources[0].name, "SISMO 2026 VZLA - Google Drive Hospitales");
 });
 
 test("HumanitarianImporter dry-run reads local files and writes report without DB writes", async () => {

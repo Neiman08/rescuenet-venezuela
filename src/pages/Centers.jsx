@@ -9,7 +9,7 @@ import { publicApi } from "../lib/api";
 export default function Centers() {
   const [rows, setRows] = useState(demoDataEnabled ? centers : []);
   const [status, setStatus] = useState("loading");
-  const [filters, setFilters] = useState({ state: "", municipality: "", type: "", operationalStatus: "" });
+  const [filters, setFilters] = useState({ country: "", state: "", municipality: "", type: "", operationalStatus: "" });
 
   useEffect(() => {
     publicApi.getHelpCenters()
@@ -17,7 +17,7 @@ export default function Centers() {
         const nextRows = [
           ...(payload.hospitals || []).map((item) => ({ ...item, type: "hospital", labelType: "Hospital", zone: item.affectedZone?.sector || "Zona no indicada", state: item.affectedZone?.state, municipality: item.affectedZone?.municipality, operationalStatus: item.status })),
           ...(payload.shelters || []).map((item) => ({ ...item, type: "shelter", labelType: "Refugio", zone: item.affectedZone?.sector || "Zona no indicada", state: item.affectedZone?.state, municipality: item.affectedZone?.municipality, operationalStatus: item.status })),
-          ...(payload.imported || []).map((item) => ({ ...item, type: item.recordType, labelType: labelForType(item.recordType), zone: item.publicLocation || item.zone || "Zona no indicada", capacity: item.capacity || 0, occupied: item.occupied || 0, operationalStatus: item.operationalStatus })),
+          ...(payload.imported || []).map((item) => ({ ...item, country: item.country, type: item.recordType, labelType: labelForType(item.recordType), zone: item.publicLocation || item.zone || "Zona no indicada", capacity: item.capacity || 0, occupied: item.occupied || 0, operationalStatus: item.operationalStatus })),
         ];
         if (nextRows.length) {
           setRows(nextRows);
@@ -37,13 +37,15 @@ export default function Centers() {
     setFilters((current) => ({ ...current, [event.target.name]: event.target.value }));
   }
 
+  const countries = [...new Set(rows.map((row) => row.country).filter(Boolean))];
   const states = [...new Set(rows.map((row) => row.state).filter(Boolean))];
   const municipalities = [...new Set(rows.map((row) => row.municipality).filter(Boolean))];
   const types = [...new Set(rows.map((row) => row.type).filter(Boolean))];
   const operationalStatuses = [...new Set(rows.map((row) => row.operationalStatus || row.status).filter(Boolean))];
   const filteredRows = rows.filter((row) => {
     const itemText = (row.acceptedItems || []).join(" ").toLowerCase();
-    return (!filters.state || row.state === filters.state)
+    return (!filters.country || row.country === filters.country)
+      && (!filters.state || row.state === filters.state)
       && (!filters.municipality || row.municipality === filters.municipality)
       && (!filters.type || row.type === filters.type || itemText.includes(filters.type.toLowerCase()))
       && (!filters.operationalStatus || (row.operationalStatus || row.status) === filters.operationalStatus);
@@ -62,7 +64,11 @@ export default function Centers() {
       {status === "fallback" && <div className="rounded-2xl bg-yellow-50 p-4 text-sm font-semibold text-yellow-800">No pudimos conectar con centros publicos del backend. Mostrando datos simulados locales.</div>}
       {status === "error" && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>}
       {status === "empty" && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noApprovedDataMessage}</div>}
-      <div className="card p-5 grid md:grid-cols-4 gap-3">
+      <div className="card p-5 grid md:grid-cols-5 gap-3">
+        <select className="input" name="country" value={filters.country} onChange={updateFilter}>
+          <option value="">Todos los paises</option>
+          {countries.map((country) => <option key={country} value={country}>{country}</option>)}
+        </select>
         <select className="input" name="state" value={filters.state} onChange={updateFilter}>
           <option value="">Todos los estados</option>
           {states.map((state) => <option key={state} value={state}>{state}</option>)}

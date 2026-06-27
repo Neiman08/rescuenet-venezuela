@@ -306,6 +306,52 @@ test("public map endpoint does not return resources outside affected operational
   }
 });
 
+test("production compatibility aliases expose persons, map and centers without token", async () => {
+  const originals = {
+    zones: prisma.affectedZone.findMany,
+    reports: prisma.emergencyReport.findMany,
+    shelters: prisma.shelter.findMany,
+    hospitals: prisma.hospital.findMany,
+    missing: prisma.missingPersonReport.findMany,
+    safe: prisma.safeReport.findMany,
+    rescued: prisma.rescuedPerson.findMany,
+    admissions: prisma.hospitalAdmission.findMany,
+    imported: prisma.importedHumanitarianRecord.findMany,
+  };
+  prisma.affectedZone.findMany = async () => [];
+  prisma.emergencyReport.findMany = async () => [];
+  prisma.shelter.findMany = async () => [];
+  prisma.hospital.findMany = async () => [];
+  prisma.missingPersonReport.findMany = async () => [];
+  prisma.safeReport.findMany = async () => [];
+  prisma.rescuedPerson.findMany = async () => [];
+  prisma.hospitalAdmission.findMany = async () => [];
+  prisma.importedHumanitarianRecord.findMany = async () => [];
+
+  try {
+    const persons = await dispatch(createApp(), { url: "/api/persons" });
+    const map = await dispatch(createApp(), { url: "/api/map" });
+    const centers = await dispatch(createApp(), { url: "/api/centers" });
+
+    assert.equal(persons.statusCode, 200);
+    assert.equal(map.statusCode, 200);
+    assert.equal(centers.statusCode, 200);
+    assert.deepEqual(persons._getJSONData(), { data: [], meta: { total: 0 } });
+    assert.equal(Array.isArray(map._getJSONData().zones), true);
+    assert.equal(Array.isArray(centers._getJSONData().hospitals), true);
+  } finally {
+    prisma.affectedZone.findMany = originals.zones;
+    prisma.emergencyReport.findMany = originals.reports;
+    prisma.shelter.findMany = originals.shelters;
+    prisma.hospital.findMany = originals.hospitals;
+    prisma.missingPersonReport.findMany = originals.missing;
+    prisma.safeReport.findMany = originals.safe;
+    prisma.rescuedPerson.findMany = originals.rescued;
+    prisma.hospitalAdmission.findMany = originals.admissions;
+    prisma.importedHumanitarianRecord.findMany = originals.imported;
+  }
+});
+
 test("public dashboard counts only affected operational resources", async () => {
   const originals = {
     overview: prisma.emergencyReport.findMany,
@@ -456,6 +502,49 @@ test("public family search can match cedula privately without exposing sensitive
     prisma.missingPersonReport.findMany = originals.missing;
     prisma.safeReport.findMany = originals.safe;
     prisma.rescuedPerson.findMany = originals.rescued;
+    prisma.hospitalAdmission.findMany = originals.admissions;
+    prisma.importedHumanitarianRecord.findMany = originals.imported;
+  }
+});
+
+test("public hospitalized endpoint returns publicSafe without private hospital details", async () => {
+  const originals = {
+    admissions: prisma.hospitalAdmission.findMany,
+    imported: prisma.importedHumanitarianRecord.findMany,
+  };
+  prisma.hospitalAdmission.findMany = async () => [];
+  prisma.importedHumanitarianRecord.findMany = async () => [{
+    id: "hospitalized-1",
+    recordType: "hospitalized_person",
+    fullName: "Nombre interno",
+    documentPrivate: { cedula: "V-12345678" },
+    medicalPrivate: { condition: "Diagnostico sensible" },
+    locationPrivate: { room: "402", bed: "B" },
+    rawPayload: { cedula: "V-12345678", telefono: "0412-1234567", room: "402" },
+    privacyLevel: "standard",
+    verificationStatus: "APROBADO",
+    publicSafe: {
+      fullName: "Persona Hospitalizada",
+      approximateAge: "30",
+      status: "Hospitalizado",
+      hospitalName: "Hospital Publico",
+      zone: "Caracas",
+      recordType: "hospitalized_person",
+    },
+    updatedAt: new Date(),
+  }];
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/hospitalized/public" });
+    assert.equal(response.statusCode, 200);
+    const body = response._getJSONData();
+    assert.equal(body.data.length, 1);
+    assert.equal(body.data[0].fullName, "Persona Hospitalizada");
+    assert.equal(JSON.stringify(body).includes("12345678"), false);
+    assert.equal(JSON.stringify(body).includes("Diagnostico sensible"), false);
+    assert.equal(JSON.stringify(body).includes("402"), false);
+    assert.equal(JSON.stringify(body).includes("rawPayload"), false);
+  } finally {
     prisma.hospitalAdmission.findMany = originals.admissions;
     prisma.importedHumanitarianRecord.findMany = originals.imported;
   }

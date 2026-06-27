@@ -12,13 +12,17 @@ router.get("/safe/public", publicController.listPublicSafeReports);
 router.post("/missing", publicSubmissionRateLimit, antiSpam, validate(publicSchemas.missing), publicController.createMissingReport);
 router.get("/missing/public", publicController.listPublicMissing);
 router.get("/rescued/public", publicController.listPublicRescued);
+router.get("/hospitalized/public", publicController.listPublicHospitalized);
 router.get("/hospitals/public", publicController.listPublicHospitals);
 router.get("/shelters/public", publicController.listPublicShelters);
 router.get("/affected-zones/public", publicController.listPublicAffectedZones);
+router.get("/persons", publicController.familySearch);
+router.get("/map", publicController.publicMap);
 router.get("/map/public", publicController.publicMap);
 router.get("/dashboard/public", publicController.publicDashboard);
 router.get("/organizations/public", publicController.listPublicOrganizations);
 router.get("/donations/public", publicController.listPublicDonations);
+router.get("/centers", publicController.helpCenters);
 router.get("/help-centers/public", publicController.helpCenters);
 router.get("/family-search/public", publicController.familySearch);
 

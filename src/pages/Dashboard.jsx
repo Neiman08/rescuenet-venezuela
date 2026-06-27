@@ -82,10 +82,10 @@ export default function Dashboard() {
       </section>
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Zonas criticas" value={(dashboardStats.criticalZones || 0).toLocaleString()} color="red" icon={<Siren />} />
-        <StatCard title="Hospitales cercanos" value={(dashboardStats.nearbyHospitals || 0).toLocaleString()} color="green" icon={<ShieldCheck />} />
-        <StatCard title="Refugios activos" value={(dashboardStats.activeShelters || 0).toLocaleString()} color="blue" icon={<CheckCircle />} />
-        <StatCard title="Personas registradas" value={(dashboardStats.registeredPeople || 0).toLocaleString()} color="purple" icon={<Building2 />} />
+        <StatCard title="Desaparecidos" value={(dashboardStats.missingPeople || 0).toLocaleString()} color="red" icon={<Siren />} />
+        <StatCard title="Hospitalizados" value={(dashboardStats.hospitalizedPeople || 0).toLocaleString()} color="blue" icon={<ShieldCheck />} />
+        <StatCard title="Rescatados" value={(dashboardStats.rescuedPeople || 0).toLocaleString()} color="green" icon={<CheckCircle />} />
+        <StatCard title="Personas publicas" value={(dashboardStats.publicPeopleTotal || dashboardStats.registeredPeople || 0).toLocaleString()} color="purple" icon={<Building2 />} />
       </section>
 
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">

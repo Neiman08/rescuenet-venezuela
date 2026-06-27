@@ -27,13 +27,66 @@ export function parseCliArgs(argv = process.argv.slice(2)) {
   return options;
 }
 
+function summarizeReportForConsole(report) {
+  const summarizeUnparseable = (items = []) => {
+    const byReason = items.reduce((acc, item) => {
+      const key = item.reason || "unknown";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    return { count: items.length, byReason };
+  };
+
+  return {
+    startedAt: report.startedAt,
+    finishedAt: report.finishedAt,
+    dryRun: report.dryRun,
+    auditOnly: report.auditOnly,
+    databaseAvailable: report.databaseAvailable,
+    warnings: report.warnings,
+    recordsExtracted: report.recordsExtracted,
+    recordsNormalized: report.recordsNormalized,
+    recordsImported: report.recordsImported,
+    recordsUpdated: report.recordsUpdated,
+    recordsBlockedByPrivacy: report.recordsBlockedByPrivacy,
+    possibleDuplicates: report.possibleDuplicates,
+    sourcesConsulted: report.sourcesConsulted,
+    sourcesSuccessful: report.sourcesSuccessful,
+    sourcesFailed: report.sourcesFailed,
+    elapsedMs: report.elapsedMs,
+    importableReportPath: report.importableReportPath,
+    sources: report.sources.map((source) => ({
+      sourceName: source.sourceName,
+      sourceUrl: source.sourceUrl,
+      connector: source.connector,
+      filesDetected: source.filesDetected,
+      extracted: source.extracted,
+      normalized: source.normalized,
+      imported: source.imported,
+      updated: source.updated,
+      filteredOut: source.filteredOut,
+      possibleDuplicates: source.possibleDuplicates,
+      elapsedMs: source.elapsedMs,
+      errors: source.errors,
+      unparseable: source.unparseable?.length ? summarizeUnparseable(source.unparseable) : undefined,
+      connectivity: source.connectivity ? {
+        ok: source.connectivity.ok,
+        status: source.connectivity.status,
+        contentType: source.connectivity.contentType,
+        requiresJavaScript: source.connectivity.requiresJavaScript,
+        blockedLikely: source.connectivity.blockedLikely,
+      } : undefined,
+    })),
+  };
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   HumanitarianImporter.run(parseCliArgs())
   .then((report) => {
     if (!report.databaseAvailable) {
       console.warn("WARNING: Database unavailable or not migrated. Re-run after DATABASE_URL is configured and migrations are applied.");
     }
-    console.log(JSON.stringify(report, null, 2));
+    console.log(JSON.stringify(summarizeReportForConsole(report), null, 2));
   })
   .catch((error) => {
     console.error(JSON.stringify({ status: "FAILED", error: error.message }, null, 2));

@@ -11,6 +11,8 @@ const centerTypes = new Set([
   "food_point",
   "medical_point",
   "volunteer_center",
+  "pet_aid_center",
+  "logistics_center",
   "donation_need",
 ]);
 
@@ -29,6 +31,8 @@ function detectCenterType(raw) {
   if (text.includes("agua")) return "water_point";
   if (text.includes("comida") || text.includes("alimento")) return "food_point";
   if (text.includes("medicina") || text.includes("salud") || text.includes("medico") || text.includes("médico")) return "medical_point";
+  if (text.includes("mascota") || text.includes("animal") || text.includes("veterin")) return "pet_aid_center";
+  if (text.includes("logistica") || text.includes("logística") || text.includes("transporte") || text.includes("almacen")) return "logistics_center";
   if (text.includes("volunt")) return "volunteer_center";
   if (text.includes("necesita") || text.includes("urgente")) return "donation_need";
   return raw?.recordType || raw?.type || "help_center";

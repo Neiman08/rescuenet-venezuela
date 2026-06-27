@@ -12,6 +12,7 @@ import { IngestionAuditService } from "./ingestionAuditService.js";
 import { isImportableHumanitarianRecord } from "./ingestionRecordQuality.js";
 import { fetchDesaparecidosTerremoto } from "./desaparecidosTerremotoConnector.js";
 import { fetchEncuentralos } from "./encuentralosConnector.js";
+import { fetchGoogleDriveHospitalAdmissions } from "./googleDriveHospitalAdmissionsConnector.js";
 import { fetchReliefWeb } from "./reliefWebConnector.js";
 import { fetchRescateVenezuela } from "./rescateVenezuelaConnector.js";
 import { scrapeRedAyudaVenezuela } from "./redAyudaVenezuelaScraper.js";
@@ -26,6 +27,7 @@ function scraperFor(source) {
   if (source.connector === "encuentralos") return fetchEncuentralos;
   if (source.connector === "terremoto_venezuela") return fetchTerremotoVenezuela;
   if (source.connector === "rescate_venezuela") return fetchRescateVenezuela;
+  if (source.connector === "google_drive_hospital_admissions") return fetchGoogleDriveHospitalAdmissions;
   if (source.connector === "reliefweb_api") return fetchReliefWeb;
   if ((source.priority || []).some((type) => ["collection_center", "help_center", "water_point", "food_point", "medical_point", "volunteer_center"].includes(type))) {
     return fetchCollectionCenterSource;
@@ -33,6 +35,10 @@ function scraperFor(source) {
   if (/red ayuda/i.test(source.name)) return scrapeRedAyudaVenezuela;
   if (/vzl/i.test(source.name)) return scrapeVzlAyuda;
   return scrapeVzlAyuda;
+}
+
+function hasDatabaseUrl() {
+  return Boolean(process.env.DATABASE_URL);
 }
 
 async function recordsFromFile(file) {
@@ -70,6 +76,7 @@ async function safeCreateRun(source) {
 }
 
 async function existingPeople() {
+  if (!hasDatabaseUrl()) return [];
   try {
     return await prisma.importedHumanitarianRecord.findMany({
       where: {
@@ -102,6 +109,7 @@ async function existingPeople() {
 
 async function persist(records, source, run, { dryRun = false } = {}) {
   if (dryRun) return { imported: 0, updated: 0 };
+  if (!hasDatabaseUrl() || !source || !run) return { imported: 0, updated: 0 };
   let updated = 0;
   let imported = 0;
   for (const record of records) {
@@ -164,9 +172,14 @@ export class HumanitarianImporter {
     };
 
     const existing = dryRun || auditOnly ? [] : await existingPeople();
+    const databaseConfigured = hasDatabaseUrl();
 
     if (dryRun) finalReport.warnings.push("Dry-run enabled: no database writes were attempted.");
     if (auditOnly) finalReport.warnings.push("Audit-only enabled: sources were checked but records were not imported.");
+    if (!dryRun && !auditOnly && !databaseConfigured) {
+      finalReport.databaseAvailable = false;
+      finalReport.warnings.push("DATABASE_URL is not configured. Generated JSON report can be imported later.");
+    }
 
     const fileSources = files.map((file) => ({
       name: `Local file: ${basename(file)}`,
@@ -201,7 +214,7 @@ export class HumanitarianImporter {
         elapsedMs: undefined,
         errors: [],
       };
-      const { dbSource, run } = dryRun || auditOnly ? { dbSource: undefined, run: undefined } : await safeCreateRun(source);
+      const { dbSource, run } = dryRun || auditOnly || !databaseConfigured ? { dbSource: undefined, run: undefined } : await safeCreateRun(source);
       if (!dryRun && !auditOnly && !run) {
         finalReport.databaseAvailable = false;
         if (!finalReport.warnings.includes("Database is unavailable or not migrated. Generated JSON report can be imported later.")) {
@@ -223,6 +236,8 @@ export class HumanitarianImporter {
           ? { kind: "file", records: await recordsFromFile(source.file) }
           : await scraperFor(source)(source);
         sourceReport.extracted = scrape.records.length;
+        sourceReport.filesDetected = scrape.files?.length || undefined;
+        sourceReport.unparseable = scrape.unparseable || undefined;
         const normalized = HumanitarianNormalizer.normalizeMany(scrape.records, source).filter(isImportableHumanitarianRecord);
         sourceReport.filteredOut = sourceReport.extracted - normalized.length;
         const deduped = HumanitarianDeduplicationService.mark(normalized, existing);

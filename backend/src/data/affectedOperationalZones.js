@@ -90,7 +90,7 @@ export function classifyOperationalResource(recordType) {
   if (recordType === "hospital" || recordType === "hospitalized_person") return "hospital_near_disaster";
   if (recordType === "shelter") return "shelter";
   if (recordType === "collection_center") return "collection_center";
-  if (["help_center", "water_point", "food_point", "medical_point"].includes(recordType)) return recordType;
+  if (["help_center", "water_point", "food_point", "medical_point", "pet_aid_center", "logistics_center"].includes(recordType)) return recordType;
   return "help_center";
 }
 

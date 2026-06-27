@@ -90,7 +90,7 @@ async function approvedImportedRecords(recordTypes, take = 500) {
   }
 }
 
-const publicCenterTypes = ["collection_center", "shelter", "hospital", "help_center", "water_point", "food_point", "medical_point", "volunteer_center", "donation_need"];
+const publicCenterTypes = ["collection_center", "shelter", "hospital", "help_center", "water_point", "food_point", "medical_point", "volunteer_center", "pet_aid_center", "logistics_center", "donation_need"];
 const familySearchTypes = ["missing_person", "hospitalized_person", "trapped_person", "safe_person", "rescued_person"];
 const operationalResourceTypes = new Set([...publicCenterTypes, "hospital"]);
 
@@ -139,6 +139,27 @@ function familyResult(base) {
     privacyLevel: base.privacyLevel || "standard",
     verificationStatus: base.verificationStatus,
     updatedAt: base.updatedAt || base.createdAt,
+  };
+}
+
+function personMapReport(record, index) {
+  const affectedZone = findAffectedOperationalZone(record);
+  if (!affectedZone) return null;
+  const typeLabels = {
+    missing_person: "Desaparecidos",
+    hospitalized_person: "Hospitalizados",
+    trapped_person: "Atrapados",
+    safe_person: "A salvo",
+    rescued_person: "Rescatados",
+  };
+  return {
+    id: `person-${record.id || index}`,
+    type: typeLabels[record.recordType] || "Personas",
+    status: record.status || record.verificationStatus || "APROBADO",
+    zone: affectedZone.sector,
+    count: 1,
+    color: record.recordType === "hospitalized_person" ? "blue" : record.recordType === "rescued_person" ? "green" : "red",
+    affectedZone: publicOperationalZone(affectedZone),
   };
 }
 
@@ -298,6 +319,31 @@ export const publicController = {
     res.json({ data: [...records.map(PublicDataSanitizer.rescued), ...imported] });
   }),
 
+  listPublicHospitalized: asyncHandler(async (_req, res) => {
+    const records = await prisma.hospitalAdmission.findMany({
+      where: { deletedAt: null, verified: true },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    const imported = await approvedImportedRecords(["hospitalized_person"]);
+    res.json({
+      data: [
+        ...records.map((record) => familyResult({
+          id: record.id,
+          type: "hospitalized_person",
+          name: record.fullName,
+          status: record.patientStatus || "Hospitalizado",
+          publicLocation: [record.hospitalName, record.municipality, record.state].filter(Boolean).join(", "),
+          hospital: record.hospitalName,
+          source: "Registro hospitalario verificado",
+          privacyLevel: "standard",
+          updatedAt: record.updatedAt || record.createdAt,
+        })),
+        ...imported,
+      ],
+    });
+  }),
+
   listPublicHospitals: asyncHandler(async (_req, res) => {
     const records = await prisma.hospital.findMany({ where: { deletedAt: null }, include: { affectedZone: true }, take: 100 });
     const imported = await approvedImportedRecords(["hospital"]);
@@ -323,15 +369,23 @@ export const publicController = {
   publicDashboard: asyncHandler(async (_req, res) => {
     const overview = await DashboardService.overview();
     const helpCenters = await approvedImportedRecords(publicCenterTypes);
-    const [hospitals, shelters, missing, safe, rescued, admissions, importedPeople] = await Promise.all([
+    const [hospitals, shelters, missing, safe, rescued, admissions, importedMissing, importedSafe, importedRescued, importedHospitalized, importedTrapped] = await Promise.all([
       prisma.hospital.findMany({ where: { deletedAt: null }, include: { affectedZone: true } }),
       prisma.shelter.findMany({ where: { deletedAt: null }, include: { affectedZone: true } }),
       prisma.missingPersonReport.count({ where: { deletedAt: null } }),
       prisma.safeReport.count({ where: { deletedAt: null } }),
       prisma.rescuedPerson.count({ where: { deletedAt: null } }),
       prisma.hospitalAdmission.count({ where: { deletedAt: null, verified: true } }),
-      prisma.importedHumanitarianRecord.count({ where: { deletedAt: null, verificationStatus: "APROBADO", recordType: { in: familySearchTypes } } }),
+      prisma.importedHumanitarianRecord.count({ where: { deletedAt: null, verificationStatus: "APROBADO", recordType: "missing_person" } }),
+      prisma.importedHumanitarianRecord.count({ where: { deletedAt: null, verificationStatus: "APROBADO", recordType: "safe_person" } }),
+      prisma.importedHumanitarianRecord.count({ where: { deletedAt: null, verificationStatus: "APROBADO", recordType: "rescued_person" } }),
+      prisma.importedHumanitarianRecord.count({ where: { deletedAt: null, verificationStatus: "APROBADO", recordType: "hospitalized_person" } }),
+      prisma.importedHumanitarianRecord.count({ where: { deletedAt: null, verificationStatus: "APROBADO", recordType: "trapped_person" } }),
     ]);
+    const missingPeople = missing + importedMissing + importedTrapped;
+    const rescuedPeople = rescued + importedRescued;
+    const hospitalizedPeople = admissions + importedHospitalized;
+    const safePeople = safe + importedSafe;
     const affectedHospitals = hospitals.filter(isInAffectedOperationalZone).length + helpCenters.filter((item) => item.operationalType === "hospital_near_disaster").length;
     const affectedShelters = shelters.filter(isInAffectedOperationalZone).length + helpCenters.filter((item) => item.operationalType === "shelter").length;
     const collectionCenters = helpCenters.filter((item) => item.operationalType === "collection_center").length;
@@ -342,7 +396,13 @@ export const publicController = {
         nearbyHospitals: affectedHospitals,
         activeShelters: affectedShelters,
         collectionCenters,
-        registeredPeople: missing + safe + rescued + admissions + importedPeople,
+        missingPeople,
+        rescuedPeople,
+        hospitalizedPeople,
+        safePeople,
+        trappedPeople: importedTrapped,
+        publicPeopleTotal: missingPeople + rescuedPeople + hospitalizedPeople + safePeople,
+        registeredPeople: missingPeople + safePeople + rescuedPeople + hospitalizedPeople,
         activeCenters: affectedHospitals + affectedShelters + collectionCenters + helpCenters.filter((item) => !["hospital_near_disaster", "shelter", "collection_center"].includes(item.operationalType)).length,
       },
       latestEmergencies: overview.latestEmergencies.map(PublicDataSanitizer.emergency),
@@ -362,9 +422,13 @@ export const publicController = {
       .map(PublicDataSanitizer.shelter)
       .map((record) => withOperationalClassification(record, "shelter"))
       .filter(Boolean);
+    const importedPeople = await approvedImportedRecords(familySearchTypes, 500);
     res.json({
       zones: affectedOperationalZones.map(publicOperationalZone),
-      reports: map.reports.map(PublicDataSanitizer.emergency),
+      reports: [
+        ...map.reports.map(PublicDataSanitizer.emergency),
+        ...importedPeople.map(personMapReport).filter(Boolean),
+      ],
       shelters,
       hospitals,
       helpCenters: await approvedImportedRecords(publicCenterTypes),

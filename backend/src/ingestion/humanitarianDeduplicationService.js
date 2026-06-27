@@ -25,7 +25,7 @@ function privateToken(value) {
 }
 
 export class HumanitarianDeduplicationService {
-  static centerTypes = new Set(["collection_center", "shelter", "hospital", "help_center", "water_point", "food_point", "medical_point", "volunteer_center", "donation_need"]);
+  static centerTypes = new Set(["collection_center", "shelter", "hospital", "help_center", "water_point", "food_point", "medical_point", "volunteer_center", "pet_aid_center", "logistics_center", "donation_need"]);
 
   static score(candidate, existing) {
     if (this.centerTypes.has(candidate.recordType) || this.centerTypes.has(existing.recordType)) {

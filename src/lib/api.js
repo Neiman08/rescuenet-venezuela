@@ -1,5 +1,8 @@
 function normalizeApiBaseUrl(value) {
-  const raw = String(value || "http://localhost:4000/api").trim().replace(/\/+$/, "");
+  const fallback = typeof window !== "undefined" && !["localhost", "127.0.0.1"].includes(window.location.hostname)
+    ? "https://rescuenet-backend-ndg5.onrender.com/api"
+    : "http://localhost:4000/api";
+  const raw = String(value || fallback).trim().replace(/\/+$/, "");
   return raw.endsWith("/api") ? raw : `${raw}/api`;
 }
 
@@ -43,6 +46,7 @@ export const publicApi = {
   getSafeReports: () => request("/safe/public"),
   getMissingReports: () => request("/missing/public"),
   getRescued: () => request("/rescued/public"),
+  getHospitalized: () => request("/hospitalized/public"),
   getMap: () => request("/map/public"),
   getDashboard: () => request("/dashboard/public"),
   getAffectedZones: () => request("/affected-zones/public"),

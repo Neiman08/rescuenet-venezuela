@@ -3,11 +3,11 @@ import StatusBadge from "./StatusBadge";
 export default function DataTable({ columns, rows }) {
   return (
     <div className="table-wrap">
-      <table className="min-w-full bg-white text-sm">
+      <table className="w-full min-w-full bg-white text-sm">
         <thead className="bg-slate-50 text-slate-500">
           <tr>
             {columns.map((column) => (
-              <th key={column.key} className="text-left font-bold px-4 py-3 whitespace-nowrap">
+              <th key={column.key} className="text-center font-bold px-4 py-3 whitespace-nowrap">
                 {column.label}
               </th>
             ))}
@@ -19,7 +19,7 @@ export default function DataTable({ columns, rows }) {
               {columns.map((column) => {
                 const value = row[column.key];
                 return (
-                  <td key={column.key} className="px-4 py-3 whitespace-nowrap">
+                  <td key={column.key} className="px-4 py-3 whitespace-nowrap text-center align-middle">
                     {column.badge ? <StatusBadge status={value} /> : column.render ? column.render(row) : value}
                   </td>
                 );

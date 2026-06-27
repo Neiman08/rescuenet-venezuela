@@ -1,5 +1,15 @@
 export const ingestionSources = [
   {
+    name: "SISMO 2026 VZLA - Google Drive Hospitales",
+    aliases: ["google-drive-hospitales", "googledrivehospitales", "sismo2026hospitales", "all-persons"],
+    url: "https://drive.google.com/drive/mobile/folders/1o36ifaRz45kAs5rKzci49aD0mP5JB_YI",
+    type: "WEBSITE",
+    trustLevel: "medium",
+    connector: "google_drive_hospital_admissions",
+    enabled: true,
+    priority: ["hospitalized_person"],
+  },
+  {
     name: "Rescate Venezuela",
     aliases: ["rescatevenezuela", "desaparecidovenezuela", "all-persons"],
     url: "https://desaparecidovenezuela.com/",
