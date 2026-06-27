@@ -30,6 +30,8 @@ npm run ingest:humanitarian -- --file=/path/to/public-data.xlsx
 
 Reports are written to `backend/reports/ingestion/`. If PostgreSQL is unavailable or migrations are not applied, the command keeps running and writes an importable JSON report. Re-run after setting `DATABASE_URL`, then execute `npm run prisma:migrate`, `npm run prisma:seed`, and `npm run ingest:humanitarian`.
 
+Collection-center ingestion supports `collection_center`, `shelter`, `hospital`, `help_center`, `water_point`, `food_point`, `medical_point`, `volunteer_center`, and `donation_need`. Public endpoints only merge approved `publicSafe` records and must not expose `rawPayload`, personal phone numbers, exact private addresses, protected coordinates, or internal contacts.
+
 ## Core Endpoints
 
 - `POST /api/auth/register`

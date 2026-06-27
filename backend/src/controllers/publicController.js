@@ -42,6 +42,8 @@ async function approvedImportedRecords(recordTypes) {
   }
 }
 
+const publicCenterTypes = ["collection_center", "shelter", "hospital", "help_center", "water_point", "food_point", "medical_point", "volunteer_center", "donation_need"];
+
 export const publicSchemas = {
   emergency: z.object({
     body: z.object({
@@ -206,14 +208,17 @@ export const publicController = {
 
   listPublicShelters: asyncHandler(async (_req, res) => {
     const records = await prisma.shelter.findMany({ where: { deletedAt: null }, include: { affectedZone: true }, take: 100 });
-    res.json({ data: records.map(PublicDataSanitizer.shelter) });
+    const imported = await approvedImportedRecords(["shelter"]);
+    res.json({ data: [...records.map(PublicDataSanitizer.shelter), ...imported] });
   }),
 
   publicDashboard: asyncHandler(async (_req, res) => {
     const overview = await DashboardService.overview();
+    const helpCenters = await approvedImportedRecords(publicCenterTypes);
     res.json({
       stats: overview.stats,
       latestEmergencies: overview.latestEmergencies.map(PublicDataSanitizer.emergency),
+      helpCenters: helpCenters.slice(0, 12),
     });
   }),
 
@@ -224,6 +229,7 @@ export const publicController = {
       reports: map.reports.map(PublicDataSanitizer.emergency),
       shelters: map.shelters.map(PublicDataSanitizer.shelter),
       hospitals: map.hospitals.map(PublicDataSanitizer.hospital),
+      helpCenters: await approvedImportedRecords(publicCenterTypes),
     });
   }),
 
@@ -258,7 +264,7 @@ export const publicController = {
     res.json({
       hospitals: hospitals.map(PublicDataSanitizer.hospital),
       shelters: shelters.map(PublicDataSanitizer.shelter),
-      imported: await approvedImportedRecords(["hospital", "shelter", "help_center", "emergency_phone"]),
+      imported: await approvedImportedRecords(publicCenterTypes),
     });
   }),
 };

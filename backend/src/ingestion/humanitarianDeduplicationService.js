@@ -21,7 +21,12 @@ function sameish(a, b) {
 }
 
 export class HumanitarianDeduplicationService {
+  static centerTypes = new Set(["collection_center", "shelter", "hospital", "help_center", "water_point", "food_point", "medical_point", "volunteer_center", "donation_need"]);
+
   static score(candidate, existing) {
+    if (this.centerTypes.has(candidate.recordType) || this.centerTypes.has(existing.recordType)) {
+      return this.centerScore(candidate, existing);
+    }
     let score = 0;
     score += tokenScore(candidate.fullName, existing.fullName) * 40;
     if (sameish(candidate.approximateAge, existing.approximateAge)) score += 10;
@@ -30,6 +35,18 @@ export class HumanitarianDeduplicationService {
     if (sameish(candidate.status, existing.status)) score += 5;
     score += tokenScore(candidate.description, existing.description) * 10;
     if (candidate.photoUrl && sameish(candidate.photoUrl, existing.photoUrl)) score += 5;
+    return Math.min(100, Math.round(score));
+  }
+
+  static centerScore(candidate, existing) {
+    let score = 0;
+    score += tokenScore(candidate.name, existing.name) * 35;
+    score += tokenScore(candidate.organization, existing.organization) * 20;
+    if (sameish(candidate.state, existing.state)) score += 10;
+    if (sameish(candidate.municipality, existing.municipality)) score += 10;
+    if (sameish(candidate.zone, existing.zone) || sameish(candidate.publicLocation, existing.publicLocation)) score += 15;
+    if (sameish(candidate.sourceName, existing.sourceName)) score += 5;
+    score += tokenScore((candidate.acceptedItems || []).join(" "), (existing.acceptedItems || []).join(" ")) * 5;
     return Math.min(100, Math.round(score));
   }
 

@@ -92,6 +92,7 @@ Status: In Progress
 - Seed the initial Venezuela affected-zone catalog for critical, high, and medium priority states.
 - Harden public emergency location sanitization and keep raw donation CRUD behind authentication.
 - Add humanitarian ingestion architecture for public-source discovery, normalization, privacy, deduplication, protected review, and CLI execution.
+- Add collection-center/resource ingestion for acopio, shelters, hospitals, water, food, medicine, volunteer centers, and urgent needs.
 - Continue with uploads, hospital admissions importers, real database migration review, and production CAPTCHA.
 
 ## Validation Policy

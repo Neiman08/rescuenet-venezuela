@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as XLSX from "xlsx";
 import { parseExcelFile } from "../src/ingestion/excelConnector.js";
+import { CollectionCenterNormalizer } from "../src/ingestion/collectionCenterNormalizer.js";
 import { HumanitarianImporter } from "../src/ingestion/humanitarianImporter.js";
 import { HumanitarianNormalizer } from "../src/ingestion/humanitarianNormalizer.js";
 import { HumanitarianDeduplicationService } from "../src/ingestion/humanitarianDeduplicationService.js";
@@ -15,7 +16,7 @@ import { prisma } from "../src/config/prisma.js";
 const source = { name: "Fuente publica", url: "https://example.org" };
 
 test("HumanitarianNormalizer keeps imported records unverified and stores raw payload", () => {
-  const raw = { nombre: "Ana Perez", edad: 28, estado: "Miranda", telefono: "04121234567", descripcion: "Vista cerca de hospital" };
+  const raw = { nombre: "Ana Perez", edad: 28, estado: "Miranda", telefono: "04121234567", descripcion: "Vista en zona afectada" };
   const record = HumanitarianNormalizer.normalize(raw, source);
 
   assert.equal(record.verificationStatus, "NO_VERIFICADO");
@@ -73,6 +74,44 @@ test("HumanitarianDeduplicationService marks likely duplicates without blocking"
   assert.equal(record.duplicateScore >= 72, true);
 });
 
+test("CollectionCenterNormalizer creates publicSafe without private address, phone or exact coordinates", () => {
+  const record = CollectionCenterNormalizer.normalize({
+    nombre: "Centro de Acopio Los Teques",
+    organizacion: "ONG Local",
+    estado: "Miranda",
+    municipio: "Guaicaipuro",
+    direccion: "Calle 12 casa 4, piso 2, Los Teques",
+    telefono: "0412-1234567",
+    lat: "10.3447000",
+    lng: "-67.0433000",
+    recibe: "agua, alimentos, medicinas",
+    horario: "8:00 AM - 6:00 PM",
+  }, source);
+
+  assert.equal(record.recordType, "collection_center");
+  assert.equal(record.verificationStatus, "NO_VERIFICADO");
+  assert.equal(record.publicSafe.name, "Centro de Acopio Los Teques");
+  assert.equal(record.publicSafe.acceptedItems.includes("agua"), true);
+  assert.equal(record.publicSafe.telefono, undefined);
+  assert.equal(record.publicSafe.contactPrivate, undefined);
+  assert.equal(record.publicSafe.addressPrivate, undefined);
+  assert.equal(record.publicSafe.latitudePrivate, undefined);
+  assert.equal(record.publicSafe.longitudePrivate, undefined);
+  assert.equal(JSON.stringify(record.publicSafe).includes("0412"), false);
+  assert.equal(JSON.stringify(record.publicSafe).includes("Calle 12"), false);
+});
+
+test("HumanitarianDeduplicationService marks likely collection center duplicates", () => {
+  const [record] = HumanitarianDeduplicationService.mark([
+    { sourceRecordId: "new-center", recordType: "collection_center", name: "Centro de Acopio Los Teques", organization: "ONG Local", state: "Miranda", municipality: "Guaicaipuro", zone: "Los Teques", acceptedItems: ["agua", "alimentos"] },
+  ], [
+    { id: "existing-center", recordType: "collection_center", name: "Centro Acopio Los Teques", organization: "ONG Local", state: "Miranda", municipality: "Guaicaipuro", zone: "Los Teques", acceptedItems: ["agua", "alimentos"] },
+  ]);
+
+  assert.equal(record.possibleDuplicate, true);
+  assert.equal(record.matchedRecordId, "existing-center");
+});
+
 test("Excel connector parses xlsx rows", async () => {
   const dir = await mkdtemp(join(tmpdir(), "rescuenet-xlsx-"));
   const file = join(dir, "admissions.xlsx");
@@ -92,7 +131,7 @@ test("CLI parser supports dry-run, source and file filters", () => {
 
   assert.equal(options.dryRun, true);
   assert.equal(options.files[0], "/tmp/sample.xlsx");
-  assert.equal(options.sources.length, 1);
+  assert.equal(options.sources.length, 2);
   assert.equal(options.sources[0].name, "VzlAyuda");
 });
 

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { CollectionCenterNormalizer } from "./collectionCenterNormalizer.js";
 import { IngestionPrivacyService, stripSensitiveText } from "./ingestionPrivacyService.js";
 
 const allowedTypes = new Set([
@@ -16,6 +17,11 @@ const allowedTypes = new Set([
   "donation_need",
   "volunteer_offer",
   "pet_missing",
+  "collection_center",
+  "water_point",
+  "food_point",
+  "medical_point",
+  "volunteer_center",
 ]);
 
 function pick(raw, keys) {
@@ -34,6 +40,11 @@ function detectType(raw) {
   if (text.includes("a salvo") || text.includes("safe")) return "safe_person";
   if (text.includes("rescatad")) return "rescued_person";
   if (text.includes("refugio")) return "shelter";
+  if (text.includes("acopio") || text.includes("donacion") || text.includes("donación")) return "collection_center";
+  if (text.includes("agua")) return "water_point";
+  if (text.includes("comida") || text.includes("alimento")) return "food_point";
+  if (text.includes("medicina") || text.includes("salud") || text.includes("medico") || text.includes("médico")) return "medical_point";
+  if (text.includes("volunt")) return "volunteer_center";
   if (text.includes("hospital")) return "hospital";
   if (text.includes("centro")) return "help_center";
   return raw?.recordType || raw?.type || "damage_report";
@@ -45,6 +56,9 @@ export class HumanitarianNormalizer {
     let recordType = detectType(raw);
     const status = pick(raw, ["status", "estado", "condition"]);
     if (String(status || "").toLowerCase().includes("fallecid")) recordType = "deceased_person_private_only";
+    if (["collection_center", "shelter", "hospital", "help_center", "water_point", "food_point", "medical_point", "volunteer_center", "donation_need"].includes(recordType)) {
+      return CollectionCenterNormalizer.normalize(raw, source);
+    }
     const normalized = {
       sourceName: source.name,
       sourceUrl: source.url,

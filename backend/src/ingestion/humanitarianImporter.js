@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { prisma } from "../config/prisma.js";
+import { fetchCollectionCenterSource } from "./collectionCentersConnector.js";
 import { parseCsv } from "./csvConnector.js";
 import { parseExcelFile } from "./excelConnector.js";
 import { enabledSources } from "./sourcesRegistry.js";
@@ -11,6 +12,9 @@ import { scrapeRedAyudaVenezuela } from "./redAyudaVenezuelaScraper.js";
 import { scrapeVzlAyuda } from "./vzlAyudaScraper.js";
 
 function scraperFor(source) {
+  if ((source.priority || []).some((type) => ["collection_center", "help_center", "water_point", "food_point", "medical_point", "volunteer_center"].includes(type))) {
+    return fetchCollectionCenterSource;
+  }
   if (/red ayuda/i.test(source.name)) return scrapeRedAyudaVenezuela;
   if (/vzl/i.test(source.name)) return scrapeVzlAyuda;
   return scrapeVzlAyuda;
@@ -53,7 +57,27 @@ async function safeCreateRun(source) {
 async function existingPeople() {
   try {
     return await prisma.importedHumanitarianRecord.findMany({
-      where: { deletedAt: null, recordType: { in: ["missing_person", "hospitalized_person", "safe_person", "rescued_person", "trapped_person"] } },
+      where: {
+        deletedAt: null,
+        recordType: {
+          in: [
+            "missing_person",
+            "hospitalized_person",
+            "safe_person",
+            "rescued_person",
+            "trapped_person",
+            "collection_center",
+            "shelter",
+            "hospital",
+            "help_center",
+            "water_point",
+            "food_point",
+            "medical_point",
+            "volunteer_center",
+            "donation_need",
+          ],
+        },
+      },
       take: 1000,
     });
   } catch {

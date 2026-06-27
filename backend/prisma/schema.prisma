@@ -622,6 +622,8 @@ model ImportedHumanitarianRecord {
   capturedAt        DateTime
   sourceRecordId    String?
   recordType        String
+  name              String?
+  organization      String?
   fullName          String?
   approximateAge    String?
   gender            String?
@@ -629,7 +631,16 @@ model ImportedHumanitarianRecord {
   hospitalName      String?
   state             String?
   municipality      String?
+  parish            String?
   zone              String?
+  addressPrivate    String?
+  publicLocation    String?
+  latitudePrivate   Decimal?             @db.Decimal(10, 7)
+  longitudePrivate  Decimal?             @db.Decimal(10, 7)
+  acceptedItems     String[]
+  operatingHours    String?
+  contactPrivate    String?
+  operationalStatus String?
   lastSeenPlace     String?
   currentPlace      String?
   description       String?

@@ -152,3 +152,39 @@ test("public missing endpoint merges approved publicSafe records without rawPayl
     prisma.importedHumanitarianRecord.findMany = originalImported;
   }
 });
+
+test("public help centers endpoint exposes approved publicSafe centers only", async () => {
+  const originalHospital = prisma.hospital.findMany;
+  const originalShelter = prisma.shelter.findMany;
+  const originalImported = prisma.importedHumanitarianRecord.findMany;
+  prisma.hospital.findMany = async () => [];
+  prisma.shelter.findMany = async () => [];
+  prisma.importedHumanitarianRecord.findMany = async () => [{
+    id: "center-1",
+    publicSafe: {
+      recordType: "collection_center",
+      name: "Centro de Acopio Los Teques",
+      organization: "ONG Local",
+      state: "Miranda",
+      municipality: "Guaicaipuro",
+      publicLocation: "Los Teques, Guaicaipuro, Miranda",
+      acceptedItems: ["agua", "alimentos"],
+      operationalStatus: "ACTIVO",
+    },
+    rawPayload: { telefono: "04121234567", direccion: "Calle 12 casa 4" },
+  }];
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/help-centers/public" });
+    assert.equal(response.statusCode, 200);
+    const body = response._getJSONData();
+    assert.equal(body.imported[0].rawPayload, undefined);
+    assert.equal(JSON.stringify(body.imported[0]).includes("0412"), false);
+    assert.equal(JSON.stringify(body.imported[0]).includes("Calle 12"), false);
+    assert.equal(body.imported[0].name, "Centro de Acopio Los Teques");
+  } finally {
+    prisma.hospital.findMany = originalHospital;
+    prisma.shelter.findMany = originalShelter;
+    prisma.importedHumanitarianRecord.findMany = originalImported;
+  }
+});
