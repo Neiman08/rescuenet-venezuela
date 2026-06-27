@@ -93,6 +93,7 @@ Status: In Progress
 - Harden public emergency location sanitization and keep raw donation CRUD behind authentication.
 - Add humanitarian ingestion architecture for public-source discovery, normalization, privacy, deduplication, protected review, and CLI execution.
 - Add collection-center/resource ingestion for acopio, shelters, hospitals, water, food, medicine, volunteer centers, and urgent needs.
+- Add operational source-connectivity auditing, API-aware connectors, source success/failure reporting, create/update import counts, and confidence scoring for real data collection.
 - Continue with uploads, hospital admissions importers, real database migration review, and production CAPTCHA.
 
 ## Validation Policy

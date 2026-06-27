@@ -651,6 +651,9 @@ model ImportedHumanitarianRecord {
   possibleDuplicate Boolean               @default(false)
   duplicateScore    Decimal?              @db.Decimal(5, 2)
   matchedRecordId   String?
+  confidenceScore   Int                   @default(0)
+  confidenceLevel   String                @default("low")
+  confidenceFactors String[]
   publicSafe        Json
   rawPayload        Json
   approvedAt        DateTime?

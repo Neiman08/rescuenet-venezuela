@@ -22,3 +22,4 @@
 - Added protected humanitarian ingestion foundation with source registry, scrapers/connectors, normalizer, privacy service, deduplication service, importer CLI, Prisma models, protected API routes, public-safe integration, institutional review page, and tests.
 - Closed ingestion phase with a Postgres migration, real Excel parsing via `xlsx`, robust CLI flags, no-DB importable reports, initial hospital/shelter seed data, and expanded security/privacy tests.
 - Added collection-center and public resource ingestion support for acopio centers, shelters, hospitals, water, food, medicine, volunteer centers, and urgent needs with public-safe privacy and frontend filters.
+- Improved humanitarian ingestion reliability with source-connectivity audits, API-aware ReliefWeb/OCHA connector support, per-source success/failure reports, create/update counts, elapsed time, and confidence scoring.

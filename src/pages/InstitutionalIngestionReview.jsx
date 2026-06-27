@@ -90,6 +90,7 @@ export default function InstitutionalIngestionReview() {
                 </div>
                 <div className="flex gap-2">
                   <StatusBadge status={record.verificationStatus} />
+                  {record.confidenceLevel && <span className="badge bg-blue-100 text-blue-700">Confianza {record.confidenceLevel} {record.confidenceScore}</span>}
                   {record.possibleDuplicate && <span className="badge bg-orange-100 text-orange-700">Duplicado {record.duplicateScore}</span>}
                 </div>
               </div>

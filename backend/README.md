@@ -21,6 +21,7 @@ npm run ingest:humanitarian
 
 ```bash
 npm run ingest:humanitarian -- --dry-run
+npm run ingest:humanitarian -- --audit-only
 npm run ingest:humanitarian -- --source=redayuda
 npm run ingest:humanitarian -- --source=vzlayuda
 npm run ingest:humanitarian -- --file=/path/to/public-data.csv
@@ -31,6 +32,12 @@ npm run ingest:humanitarian -- --file=/path/to/public-data.xlsx
 Reports are written to `backend/reports/ingestion/`. If PostgreSQL is unavailable or migrations are not applied, the command keeps running and writes an importable JSON report. Re-run after setting `DATABASE_URL`, then execute `npm run prisma:migrate`, `npm run prisma:seed`, and `npm run ingest:humanitarian`.
 
 Collection-center ingestion supports `collection_center`, `shelter`, `hospital`, `help_center`, `water_point`, `food_point`, `medical_point`, `volunteer_center`, and `donation_need`. Public endpoints only merge approved `publicSafe` records and must not expose `rawPayload`, personal phone numbers, exact private addresses, protected coordinates, or internal contacts.
+
+Ingestion reports include consulted, successful, and failed sources; extracted, normalized, imported, updated, duplicate, and privacy-blocked records; elapsed time; per-source connectivity diagnostics; and confidence scores for reviewer prioritization.
+
+To add a source, edit `src/ingestion/sourcesRegistry.js` with `name`, `url`, `type`, `trustLevel`, `connector`, and `priority`. Use `connector: "reliefweb_api"` with `apiUrl` for ReliefWeb/OCHA API sources; use `connector: "html"` for HTML pages; use `--file` for public CSV/JSON/XLSX/Google Sheet exports. After adding a source, run `npm run ingest:humanitarian -- --audit-only --source=<name-fragment>` to verify status code, content type, dynamic-JavaScript signals, embedded JSON, API hints, bot blocking, and elapsed time.
+
+If a source returns zero records, check the report for: network failure, timeout, `401/403/429/503` blocking, JavaScript-rendered content, missing embedded JSON, changed HTML labels, or unavailable database. For dynamic sites, identify an API/JSON/CSV/Google Sheet endpoint and register that endpoint instead of scraping the rendered page.
 
 ## Core Endpoints
 

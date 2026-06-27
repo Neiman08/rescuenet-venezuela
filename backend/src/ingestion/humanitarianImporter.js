@@ -3,15 +3,19 @@ import { basename, extname, join } from "node:path";
 import { prisma } from "../config/prisma.js";
 import { fetchCollectionCenterSource } from "./collectionCentersConnector.js";
 import { parseCsv } from "./csvConnector.js";
+import { DataQualityScoringService } from "./dataQualityScoringService.js";
 import { parseExcelFile } from "./excelConnector.js";
 import { enabledSources } from "./sourcesRegistry.js";
 import { HumanitarianNormalizer } from "./humanitarianNormalizer.js";
 import { HumanitarianDeduplicationService } from "./humanitarianDeduplicationService.js";
 import { IngestionAuditService } from "./ingestionAuditService.js";
+import { fetchReliefWeb } from "./reliefWebConnector.js";
 import { scrapeRedAyudaVenezuela } from "./redAyudaVenezuelaScraper.js";
 import { scrapeVzlAyuda } from "./vzlAyudaScraper.js";
+import { auditSourceConnectivity } from "./sourceConnectivityAudit.js";
 
 function scraperFor(source) {
+  if (source.connector === "reliefweb_api") return fetchReliefWeb;
   if ((source.priority || []).some((type) => ["collection_center", "help_center", "water_point", "food_point", "medical_point", "volunteer_center"].includes(type))) {
     return fetchCollectionCenterSource;
   }
@@ -86,25 +90,35 @@ async function existingPeople() {
 }
 
 async function persist(records, source, run, { dryRun = false } = {}) {
-  if (dryRun) return 0;
+  if (dryRun) return { imported: 0, updated: 0 };
+  let updated = 0;
   let imported = 0;
   for (const record of records) {
     try {
-      await prisma.importedHumanitarianRecord.create({
-        data: {
-          ...record,
-          sourceId: source?.id,
-          ingestionRunId: run?.id,
-          capturedAt: new Date(record.capturedAt),
-          duplicateScore: record.duplicateScore,
-        },
-      });
-      imported += 1;
+      const existing = record.sourceRecordId
+        ? await prisma.importedHumanitarianRecord.findFirst({
+          where: { sourceName: record.sourceName, sourceRecordId: record.sourceRecordId, deletedAt: null },
+        })
+        : null;
+      const data = {
+        ...record,
+        sourceId: source?.id,
+        ingestionRunId: run?.id,
+        capturedAt: new Date(record.capturedAt),
+        duplicateScore: record.duplicateScore,
+      };
+      if (existing) {
+        await prisma.importedHumanitarianRecord.update({ where: { id: existing.id }, data });
+        updated += 1;
+      } else {
+        await prisma.importedHumanitarianRecord.create({ data });
+        imported += 1;
+      }
     } catch {
       break;
     }
   }
-  return imported;
+  return { imported, updated };
 }
 
 async function writeImportableReport(report, reportDir = join(process.cwd(), "reports", "ingestion")) {
@@ -116,25 +130,32 @@ async function writeImportableReport(report, reportDir = join(process.cwd(), "re
 }
 
 export class HumanitarianImporter {
-  static async run({ sources = enabledSources(), files = [], dryRun = false, writeReport = true, reportDir } = {}) {
+  static async run({ sources = enabledSources(), files = [], dryRun = false, auditOnly = false, writeReport = true, reportDir } = {}) {
     const finalReport = {
       startedAt: new Date().toISOString(),
       finishedAt: undefined,
       dryRun,
+      auditOnly,
       databaseAvailable: true,
       warnings: [],
       sources: [],
       recordsExtracted: 0,
       recordsNormalized: 0,
       recordsImported: 0,
+      recordsUpdated: 0,
       recordsBlockedByPrivacy: 0,
       possibleDuplicates: 0,
+      sourcesConsulted: 0,
+      sourcesSuccessful: 0,
+      sourcesFailed: 0,
+      elapsedMs: undefined,
       importableReportPath: undefined,
     };
 
-    const existing = dryRun ? [] : await existingPeople();
+    const existing = dryRun || auditOnly ? [] : await existingPeople();
 
     if (dryRun) finalReport.warnings.push("Dry-run enabled: no database writes were attempted.");
+    if (auditOnly) finalReport.warnings.push("Audit-only enabled: sources were checked but records were not imported.");
 
     const fileSources = files.map((file) => ({
       name: `Local file: ${basename(file)}`,
@@ -146,35 +167,63 @@ export class HumanitarianImporter {
     }));
 
     for (const source of [...sources, ...fileSources]) {
-      const sourceReport = { sourceName: source.name, sourceUrl: source.url, extracted: 0, normalized: 0, imported: 0, errors: [] };
-      const { dbSource, run } = dryRun ? { dbSource: undefined, run: undefined } : await safeCreateRun(source);
-      if (!dryRun && !run) {
+      const sourceStartedAt = Date.now();
+      finalReport.sourcesConsulted += 1;
+      const sourceReport = {
+        sourceName: source.name,
+        sourceUrl: source.url,
+        connector: source.connector || (source.file ? "file" : "html"),
+        extracted: 0,
+        normalized: 0,
+        imported: 0,
+        updated: 0,
+        possibleDuplicates: 0,
+        connectivity: source.file ? { ok: true, connector: "file" } : undefined,
+        elapsedMs: undefined,
+        errors: [],
+      };
+      const { dbSource, run } = dryRun || auditOnly ? { dbSource: undefined, run: undefined } : await safeCreateRun(source);
+      if (!dryRun && !auditOnly && !run) {
         finalReport.databaseAvailable = false;
         if (!finalReport.warnings.includes("Database is unavailable or not migrated. Generated JSON report can be imported later.")) {
           finalReport.warnings.push("Database is unavailable or not migrated. Generated JSON report can be imported later.");
         }
       }
       try {
+        if (!source.file) sourceReport.connectivity = await auditSourceConnectivity(source);
+        if (auditOnly) {
+          finalReport.sourcesSuccessful += sourceReport.connectivity?.ok ? 1 : 0;
+          finalReport.sourcesFailed += sourceReport.connectivity?.ok ? 0 : 1;
+          sourceReport.elapsedMs = Date.now() - sourceStartedAt;
+          finalReport.sources.push(sourceReport);
+          continue;
+        }
         const scrape = source.file
           ? { kind: "file", records: await recordsFromFile(source.file) }
           : await scraperFor(source)(source);
         sourceReport.extracted = scrape.records.length;
         const normalized = HumanitarianNormalizer.normalizeMany(scrape.records, source);
         const deduped = HumanitarianDeduplicationService.mark(normalized, existing);
-        sourceReport.normalized = deduped.length;
-        sourceReport.imported = await persist(deduped, dbSource, run, { dryRun });
-        sourceReport.possibleDuplicates = deduped.filter((record) => record.possibleDuplicate).length;
+        const scored = DataQualityScoringService.scoreMany(deduped, source, existing);
+        sourceReport.normalized = scored.length;
+        const persisted = await persist(scored, dbSource, run, { dryRun });
+        sourceReport.imported = persisted.imported;
+        sourceReport.updated = persisted.updated;
+        sourceReport.possibleDuplicates = scored.filter((record) => record.possibleDuplicate).length;
         finalReport.recordsExtracted += sourceReport.extracted;
         finalReport.recordsNormalized += sourceReport.normalized;
         finalReport.recordsImported += sourceReport.imported;
+        finalReport.recordsUpdated += sourceReport.updated;
         finalReport.possibleDuplicates += sourceReport.possibleDuplicates;
-        finalReport.recordsBlockedByPrivacy += deduped.filter((record) => record.privacyLevel === "restricted").length;
-        sourceReport.records = deduped;
+        finalReport.recordsBlockedByPrivacy += scored.filter((record) => ["restricted", "private_only"].includes(record.privacyLevel)).length;
+        sourceReport.records = scored;
+        finalReport.sourcesSuccessful += 1;
         if (run?.id) {
           await IngestionAuditService.record({ ingestionRunId: run.id, action: "source_ingested", sourceName: source.name, result: "SUCCESS", metadata: sourceReport });
         }
       } catch (error) {
         sourceReport.errors.push(error.message);
+        finalReport.sourcesFailed += 1;
         if (run?.id) {
           await IngestionAuditService.record({ ingestionRunId: run.id, action: "source_ingested", sourceName: source.name, result: "ERROR", metadata: { error: error.message } });
         }
@@ -189,7 +238,7 @@ export class HumanitarianImporter {
             recordsExtracted: sourceReport.extracted,
             recordsNormalized: sourceReport.normalized,
             recordsImported: sourceReport.imported,
-            recordsBlockedByPrivacy: sourceReport.records?.filter((record) => record.privacyLevel === "restricted").length || 0,
+            recordsBlockedByPrivacy: sourceReport.records?.filter((record) => ["restricted", "private_only"].includes(record.privacyLevel)).length || 0,
             duplicatesFound: sourceReport.possibleDuplicates || 0,
             errorSummary: sourceReport.errors.join("; ") || undefined,
             report: sourceReport,
@@ -199,10 +248,12 @@ export class HumanitarianImporter {
         // Database may not be migrated yet. The importable report below remains the fallback.
       }
 
+      sourceReport.elapsedMs = Date.now() - sourceStartedAt;
       finalReport.sources.push(sourceReport);
     }
 
     finalReport.finishedAt = new Date().toISOString();
+    finalReport.elapsedMs = new Date(finalReport.finishedAt).getTime() - new Date(finalReport.startedAt).getTime();
     if (writeReport || finalReport.recordsImported < finalReport.recordsNormalized) {
       finalReport.importableReportPath = await writeImportableReport(finalReport, reportDir);
     }

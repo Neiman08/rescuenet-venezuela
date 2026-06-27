@@ -6,6 +6,7 @@ import { join } from "node:path";
 import * as XLSX from "xlsx";
 import { parseExcelFile } from "../src/ingestion/excelConnector.js";
 import { CollectionCenterNormalizer } from "../src/ingestion/collectionCenterNormalizer.js";
+import { DataQualityScoringService } from "../src/ingestion/dataQualityScoringService.js";
 import { HumanitarianImporter } from "../src/ingestion/humanitarianImporter.js";
 import { HumanitarianNormalizer } from "../src/ingestion/humanitarianNormalizer.js";
 import { HumanitarianDeduplicationService } from "../src/ingestion/humanitarianDeduplicationService.js";
@@ -112,6 +113,20 @@ test("HumanitarianDeduplicationService marks likely collection center duplicates
   assert.equal(record.matchedRecordId, "existing-center");
 });
 
+test("DataQualityScoringService scores source trust and duplicate factors", () => {
+  const scored = DataQualityScoringService.score({
+    recordType: "missing_person",
+    fullName: "Ana Perez",
+    sourceName: "ReliefWeb Venezuela",
+    possibleDuplicate: true,
+    publicSafe: {},
+  }, { trustLevel: "high" });
+
+  assert.equal(scored.confidenceLevel, "medium");
+  assert.equal(scored.confidenceFactors.includes("official_or_humanitarian_source"), true);
+  assert.equal(scored.confidenceFactors.includes("possible_duplicate"), true);
+});
+
 test("Excel connector parses xlsx rows", async () => {
   const dir = await mkdtemp(join(tmpdir(), "rescuenet-xlsx-"));
   const file = join(dir, "admissions.xlsx");
@@ -126,10 +141,11 @@ test("Excel connector parses xlsx rows", async () => {
   assert.equal(rows[0].sourceSheet, "Ingresos");
 });
 
-test("CLI parser supports dry-run, source and file filters", () => {
-  const options = parseCliArgs(["--dry-run", "--source=vzlayuda", "--file=/tmp/sample.xlsx"]);
+test("CLI parser supports dry-run, audit-only, source and file filters", () => {
+  const options = parseCliArgs(["--dry-run", "--audit-only", "--source=vzlayuda", "--file=/tmp/sample.xlsx"]);
 
   assert.equal(options.dryRun, true);
+  assert.equal(options.auditOnly, true);
   assert.equal(options.files[0], "/tmp/sample.xlsx");
   assert.equal(options.sources.length, 2);
   assert.equal(options.sources[0].name, "VzlAyuda");
@@ -147,6 +163,11 @@ test("HumanitarianImporter dry-run reads local files and writes report without D
   assert.equal(report.dryRun, true);
   assert.equal(report.recordsNormalized, 1);
   assert.equal(report.recordsImported, 0);
+  assert.equal(report.recordsUpdated, 0);
+  assert.equal(report.sourcesConsulted, 1);
+  assert.equal(report.sourcesSuccessful, 1);
+  assert.equal(report.sourcesFailed, 0);
+  assert.equal(typeof report.elapsedMs, "number");
   assert.equal(saved.sources[0].records[0].privacyLevel, "restricted");
 });
 
@@ -158,9 +179,11 @@ test("HumanitarianImporter no-DB mode produces importable report and warning", a
 
   const originalUpsert = prisma.ingestionSource.upsert;
   const originalFindMany = prisma.importedHumanitarianRecord.findMany;
+  const originalFindFirst = prisma.importedHumanitarianRecord.findFirst;
   const originalCreate = prisma.importedHumanitarianRecord.create;
   prisma.ingestionSource.upsert = async () => { throw new Error("DB unavailable"); };
   prisma.importedHumanitarianRecord.findMany = async () => { throw new Error("DB unavailable"); };
+  prisma.importedHumanitarianRecord.findFirst = async () => { throw new Error("DB unavailable"); };
   prisma.importedHumanitarianRecord.create = async () => { throw new Error("DB unavailable"); };
 
   try {
@@ -173,6 +196,7 @@ test("HumanitarianImporter no-DB mode produces importable report and warning", a
   } finally {
     prisma.ingestionSource.upsert = originalUpsert;
     prisma.importedHumanitarianRecord.findMany = originalFindMany;
+    prisma.importedHumanitarianRecord.findFirst = originalFindFirst;
     prisma.importedHumanitarianRecord.create = originalCreate;
   }
 });

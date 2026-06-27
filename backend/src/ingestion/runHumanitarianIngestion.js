@@ -6,6 +6,7 @@ export function parseCliArgs(argv = process.argv.slice(2)) {
   const options = { dryRun: false, sources: enabledSources(), files: [], writeReport: true };
   for (const arg of argv) {
     if (arg === "--dry-run") options.dryRun = true;
+    else if (arg === "--audit-only") options.auditOnly = true;
     else if (arg === "--no-report") options.writeReport = false;
     else if (arg.startsWith("--source=")) {
       const key = arg.split("=")[1].toLowerCase();
