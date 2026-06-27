@@ -1,0 +1,532 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleName {
+  PUBLICO
+  VICTIMA
+  FAMILIAR
+  RESCATISTA
+  COORDINADOR
+  HOSPITAL
+  REFUGIO
+  ONG
+  DONANTE
+  GOBIERNO
+  ORGANIZACION_INTERNACIONAL
+  ADMINISTRADOR
+}
+
+enum VerificationStatus {
+  SIMULADA
+  PENDIENTE
+  VERIFICADA
+  RECHAZADA
+}
+
+enum EmergencyStatus {
+  RECEPCION
+  TRIAJE
+  ASIGNADO
+  EN_RUTA
+  EN_SITIO
+  RESUELTO
+  CANCELADO
+}
+
+enum Priority {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum PersonStatus {
+  EN_RESGUARDO
+  EN_HOSPITAL
+  IDENTIFICACION_EN_PROCESO
+  FAMILIAR_LOCALIZADO
+  REUNIFICADO
+  FALLECIDO_CONFIRMADO
+}
+
+enum OrganizationStatus {
+  PENDIENTE
+  VERIFICADA
+  SUSPENDIDA
+  RECHAZADA
+}
+
+enum DonationStatus {
+  RECIBIDA
+  EN_PROCESO
+  ENTREGADA
+  AUDITADA
+  RECHAZADA
+}
+
+model User {
+  id                String              @id @default(uuid())
+  email             String              @unique
+  passwordHash      String
+  fullName          String
+  phone             String?
+  isActive          Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  deletedAt         DateTime?
+  roles             UserRole[]
+  emergencyReports  EmergencyReport[]   @relation("EmergencyReporter")
+  safeReports       SafeReport[]
+  missingReports    MissingPersonReport[]
+  donations         Donation[]
+  familyClaims      FamilyClaim[]
+  volunteers        Volunteer[]
+  auditLogs         AuditLog[]
+  uploadedFiles     UploadedFile[]
+  notifications     Notification[]
+
+  @@index([deletedAt])
+  @@index([createdAt])
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        RoleName         @unique
+  label       String
+  permissions RolePermission[]
+  users       UserRole[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Permission {
+  id        String           @id @default(uuid())
+  key       String           @unique
+  label     String
+  roles     RolePermission[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+model UserRole {
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  createdAt    DateTime   @default(now())
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model AffectedZone {
+  id                String                @id @default(uuid())
+  code              String                @unique
+  state             String
+  municipality      String
+  sector            String
+  level             Priority
+  lat               Decimal               @db.Decimal(10, 7)
+  lng               Decimal               @db.Decimal(10, 7)
+  radiusKm          Int
+  verification      VerificationStatus    @default(SIMULADA)
+  impacts           String[]
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  deletedAt         DateTime?
+  emergencyReports  EmergencyReport[]
+  safeReports       SafeReport[]
+  missingReports    MissingPersonReport[]
+  rescuedPeople     RescuedPerson[]
+  shelters          Shelter[]
+  hospitals         Hospital[]
+  organizations     OrganizationZone[]
+  donations         Donation[]
+  rescueLocations   RescueLocation[]
+  volunteers        Volunteer[]
+  rescueTeams       RescueTeam[]
+
+  @@index([state, municipality])
+  @@index([level, deletedAt])
+}
+
+model EmergencyReport {
+  id             String          @id @default(uuid())
+  code           String          @unique
+  reporterId     String?
+  affectedZoneId String
+  type           String
+  description    String
+  priority       Priority        @default(MEDIA)
+  status         EmergencyStatus @default(RECEPCION)
+  peopleAffected Int             @default(0)
+  publicLocation String
+  exactLocation  String?
+  lat            Decimal?        @db.Decimal(10, 7)
+  lng            Decimal?        @db.Decimal(10, 7)
+  source         String          @default("api")
+  assignedTeamId String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  affectedZone   AffectedZone    @relation(fields: [affectedZoneId], references: [id])
+  assignedTeam   RescueTeam?     @relation(fields: [assignedTeamId], references: [id])
+  reporter       User?           @relation("EmergencyReporter", fields: [reporterId], references: [id])
+  files          UploadedFile[]
+
+  @@index([affectedZoneId, status, priority])
+  @@index([createdAt])
+  @@index([deletedAt])
+}
+
+model SafeReport {
+  id             String       @id @default(uuid())
+  userId         String?
+  affectedZoneId String
+  fullName       String
+  phone          String?
+  currentPlace   String
+  message        String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+  affectedZone   AffectedZone @relation(fields: [affectedZoneId], references: [id])
+  user           User?        @relation(fields: [userId], references: [id])
+
+  @@index([affectedZoneId, createdAt])
+}
+
+model MissingPersonReport {
+  id             String        @id @default(uuid())
+  reporterId     String?
+  affectedZoneId String
+  fullName       String
+  age            Int?
+  documentId     String?
+  sex            String?
+  description    String?
+  clothing       String?
+  lastSeenPlace  String?
+  consentPublic  Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+  affectedZone   AffectedZone  @relation(fields: [affectedZoneId], references: [id])
+  reporter       User?         @relation(fields: [reporterId], references: [id])
+  matches        MatchResult[]
+  files          UploadedFile[]
+
+  @@index([affectedZoneId, fullName])
+  @@index([createdAt])
+}
+
+model RescuedPerson {
+  id                String          @id @default(uuid())
+  code              String          @unique
+  affectedZoneId    String
+  name              String?
+  identified        Boolean         @default(false)
+  approximateAge    String?
+  sex               String?
+  conditionSummary  String?
+  conscious         Boolean?
+  injuriesSummary   String?
+  distinctiveMarks  String?
+  clothing          String?
+  rescueLocationId  String?
+  rescueDate        DateTime?
+  rescueTeamId      String?
+  responsibleName   String?
+  hospitalId        String?
+  shelterId         String?
+  status            PersonStatus    @default(IDENTIFICACION_EN_PROCESO)
+  isMinor           Boolean         @default(false)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  deletedAt         DateTime?
+  affectedZone      AffectedZone    @relation(fields: [affectedZoneId], references: [id])
+  hospital          Hospital?       @relation(fields: [hospitalId], references: [id])
+  rescueLocation    RescueLocation? @relation(fields: [rescueLocationId], references: [id])
+  rescueTeam        RescueTeam?     @relation(fields: [rescueTeamId], references: [id])
+  shelter           Shelter?        @relation(fields: [shelterId], references: [id])
+  matches           MatchResult[]
+  familyClaims      FamilyClaim[]
+  files             UploadedFile[]
+
+  @@index([affectedZoneId, status])
+  @@index([isMinor, deletedAt])
+}
+
+model RescueLocation {
+  id             String          @id @default(uuid())
+  affectedZoneId String
+  publicLabel    String
+  exactAddress   String?
+  lat            Decimal?        @db.Decimal(10, 7)
+  lng            Decimal?        @db.Decimal(10, 7)
+  accessNotes    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  affectedZone   AffectedZone    @relation(fields: [affectedZoneId], references: [id])
+  rescuedPeople  RescuedPerson[]
+
+  @@index([affectedZoneId])
+}
+
+model Shelter {
+  id             String          @id @default(uuid())
+  affectedZoneId String
+  name           String
+  capacity       Int
+  occupied       Int             @default(0)
+  status         String          @default("ACTIVO")
+  contact        String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  affectedZone   AffectedZone    @relation(fields: [affectedZoneId], references: [id])
+  rescuedPeople  RescuedPerson[]
+
+  @@index([affectedZoneId, status])
+}
+
+model Hospital {
+  id             String          @id @default(uuid())
+  affectedZoneId String
+  name           String
+  capacity       Int
+  occupied       Int             @default(0)
+  status         String          @default("OPERATIVO")
+  contact        String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  affectedZone   AffectedZone    @relation(fields: [affectedZoneId], references: [id])
+  rescuedPeople  RescuedPerson[]
+
+  @@index([affectedZoneId, status])
+}
+
+model Organization {
+  id             String             @id @default(uuid())
+  name           String
+  country        String
+  city           String?
+  representative String?
+  documentRef    String?
+  contact        String?
+  bankAccountRef String?
+  walletRef      String?
+  categories     String[]
+  status         OrganizationStatus @default(PENDIENTE)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  deletedAt      DateTime?
+  zones          OrganizationZone[]
+  donations      Donation[]
+  expenses       DonationExpense[]
+  volunteers     Volunteer[]
+
+  @@index([status, deletedAt])
+}
+
+model OrganizationZone {
+  organizationId String
+  affectedZoneId String
+  createdAt      DateTime     @default(now())
+  affectedZone   AffectedZone @relation(fields: [affectedZoneId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, affectedZoneId])
+  @@index([affectedZoneId])
+}
+
+model Donation {
+  id             String            @id @default(uuid())
+  code           String            @unique
+  donorId        String?
+  organizationId String
+  affectedZoneId String?
+  amount         Decimal           @db.Decimal(14, 2)
+  currency       String            @default("USD")
+  method         String
+  status         DonationStatus    @default(RECIBIDA)
+  publicDonor    Boolean           @default(false)
+  intendedUse    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deletedAt      DateTime?
+  affectedZone   AffectedZone?     @relation(fields: [affectedZoneId], references: [id])
+  donor          User?             @relation(fields: [donorId], references: [id])
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  expenses       DonationExpense[]
+
+  @@index([organizationId, status])
+  @@index([affectedZoneId])
+  @@index([createdAt])
+}
+
+model DonationExpense {
+  id             String            @id @default(uuid())
+  donationId     String?
+  organizationId String
+  date           DateTime          @default(now())
+  description    String
+  category       String
+  amount         Decimal           @db.Decimal(14, 2)
+  status         String            @default("EN_REVISION")
+  affectedZone   String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deletedAt      DateTime?
+  donation       Donation?         @relation(fields: [donationId], references: [id])
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  evidence       ExpenseEvidence[]
+
+  @@index([organizationId, status])
+}
+
+model ExpenseEvidence {
+  id        String          @id @default(uuid())
+  expenseId String
+  fileId    String?
+  notes     String?
+  createdAt DateTime        @default(now())
+  expense   DonationExpense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  file      UploadedFile?   @relation(fields: [fileId], references: [id])
+}
+
+model FamilyClaim {
+  id              String        @id @default(uuid())
+  rescuedPersonId String
+  claimantUserId  String?
+  relationship    String
+  status          String        @default("PENDIENTE")
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  rescuedPerson   RescuedPerson @relation(fields: [rescuedPersonId], references: [id])
+  claimantUser    User?         @relation(fields: [claimantUserId], references: [id])
+
+  @@index([rescuedPersonId, status])
+}
+
+model MatchResult {
+  id                    String              @id @default(uuid())
+  missingPersonReportId String
+  rescuedPersonId       String
+  score                 Decimal             @db.Decimal(5, 2)
+  factors               Json
+  status                String              @default("PENDIENTE")
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  missingPersonReport   MissingPersonReport @relation(fields: [missingPersonReportId], references: [id])
+  rescuedPerson         RescuedPerson       @relation(fields: [rescuedPersonId], references: [id])
+
+  @@index([missingPersonReportId, score])
+  @@index([rescuedPersonId])
+}
+
+model Volunteer {
+  id             String        @id @default(uuid())
+  userId         String?
+  organizationId String?
+  affectedZoneId String?
+  skills         String[]
+  status         String        @default("DISPONIBLE")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+  affectedZone   AffectedZone? @relation(fields: [affectedZoneId], references: [id])
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  user           User?         @relation(fields: [userId], references: [id])
+
+  @@index([affectedZoneId, status])
+}
+
+model RescueTeam {
+  id               String            @id @default(uuid())
+  affectedZoneId   String?
+  name             String
+  type             String
+  members          Int               @default(0)
+  status           String            @default("DISPONIBLE")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?
+  affectedZone     AffectedZone?     @relation(fields: [affectedZoneId], references: [id])
+  emergencyReports EmergencyReport[]
+  rescuedPeople    RescuedPerson[]
+
+  @@index([affectedZoneId, status])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  module    String
+  result    String
+  ip        String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([module, createdAt])
+  @@index([userId, createdAt])
+}
+
+model UploadedFile {
+  id                    String               @id @default(uuid())
+  ownerId               String?
+  emergencyReportId     String?
+  missingPersonReportId String?
+  rescuedPersonId       String?
+  filename              String
+  originalName          String
+  mimeType              String
+  size                  Int
+  path                  String
+  visibility            String               @default("RESTRINGIDA")
+  createdAt             DateTime             @default(now())
+  deletedAt             DateTime?
+  emergencyReport       EmergencyReport?     @relation(fields: [emergencyReportId], references: [id])
+  missingPersonReport   MissingPersonReport? @relation(fields: [missingPersonReportId], references: [id])
+  owner                 User?                @relation(fields: [ownerId], references: [id])
+  rescuedPerson         RescuedPerson?       @relation(fields: [rescuedPersonId], references: [id])
+  expenseEvidence       ExpenseEvidence[]
+
+  @@index([ownerId, createdAt])
+  @@index([visibility])
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String?
+  type      String
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User?     @relation(fields: [userId], references: [id])
+
+  @@index([userId, readAt])
+}

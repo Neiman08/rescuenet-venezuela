@@ -60,6 +60,19 @@ Status: Complete
 - Add map layers, zone filters, report clusters, and logistics corridors.
 - Prepare AI contracts for duplicate detection, triage classification, and family/rescued matching.
 
+## Phase 6 - Backend and Operational Platform
+
+Status: Complete
+
+- Add Express backend under `/backend`.
+- Configure PostgreSQL Prisma schema from `DATABASE_SCHEMA.md`.
+- Implement JWT auth, role and permission middleware.
+- Implement REST routes for auth, emergencies, missing people, rescued people, hospitals, shelters, organizations, donations, dashboard, map, logistics, and uploads.
+- Add Socket.IO event server.
+- Add MatchingEngine and EmergencyDispatchEngine with tests.
+- Add audit, file upload, AI placeholder, and GIS service architecture.
+- Validate backend and frontend without changing working frontend behavior.
+
 ## Validation Policy
 
 After each phase:
