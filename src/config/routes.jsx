@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  BrainCircuit,
   Building2,
   Globe2,
   HandCoins,
@@ -14,6 +15,7 @@ import {
   Users,
 } from "lucide-react";
 import AdminVerification from "../pages/AdminVerification";
+import AIReadiness from "../pages/AIReadiness";
 import Centers from "../pages/Centers";
 import Dashboard from "../pages/Dashboard";
 import DonationAudit from "../pages/DonationAudit";
@@ -59,6 +61,7 @@ export const appRoutes = [
   { path: "/gastos", label: "Gastos", element: <Expenses />, permission: permissions.AUDIT_DONATIONS, priority: "audit" },
   { path: "/gobierno", label: "Gobierno", navLabel: "Gobierno", icon: BarChart3, element: <GovernmentPanel />, permission: permissions.VIEW_GOVERNMENT_PANEL, priority: "restricted" },
   { path: "/internacional", label: "Internacional", navLabel: "Global", icon: Globe2, element: <InternationalPanel />, permission: permissions.VIEW_INTERNATIONAL_PANEL, priority: "humanitarian" },
+  { path: "/ia", label: "Arquitectura IA", navLabel: "IA", icon: BrainCircuit, element: <AIReadiness />, permission: permissions.ADMINISTER_AI, priority: "restricted" },
   { path: "/admin", label: "Administracion", navLabel: "Admin", icon: Settings, element: <AdminVerification />, permission: permissions.ADMINISTER_SYSTEM, priority: "restricted" },
 ];
 

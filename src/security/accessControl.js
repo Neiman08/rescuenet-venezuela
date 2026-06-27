@@ -19,6 +19,7 @@ export const permissions = {
   VIEW_INTERNATIONAL_PANEL: "view_international_panel",
   ADMINISTER_SYSTEM: "administer_system",
   VIEW_AUDIT_LOGS: "view_audit_logs",
+  ADMINISTER_AI: "administer_ai",
 };
 
 export const rolePermissions = {

@@ -3,6 +3,7 @@ import MapPreview from "../components/MapPreview";
 import StatusBadge from "../components/StatusBadge";
 import { affectedZones } from "../data/affectedZones";
 import { mapReports } from "../data/mockData";
+import { gisLayers, logisticsCorridors } from "../data/gisLayers";
 
 export default function LiveMap() {
   return (
@@ -24,6 +25,16 @@ export default function LiveMap() {
               </div>
             ))}
           </div>
+          <h2 className="font-black text-lg pt-2">Capas GIS</h2>
+          <div className="space-y-2">
+            {gisLayers.map((layer) => (
+              <label key={layer.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-sm">
+                <input type="checkbox" defaultChecked={layer.visible} />
+                <span className="font-semibold flex-1">{layer.label}</span>
+                <span className="text-xs text-slate-500">{layer.status}</span>
+              </label>
+            ))}
+          </div>
         </aside>
         <section className="card p-5 h-[720px]">
           <MapPreview />
@@ -40,6 +51,21 @@ export default function LiveMap() {
             </div>
           </div>
         ))}
+      </div>
+      <div className="card p-5">
+        <h2 className="font-black mb-4">Corredores logisticos</h2>
+        <div className="grid md:grid-cols-3 gap-4">
+          {logisticsCorridors.map((corridor) => (
+            <div key={corridor.id} className="p-4 rounded-2xl bg-slate-50">
+              <p className="font-black">{corridor.id}</p>
+              <p className="text-sm text-slate-600">{corridor.origin} - {corridor.destination}</p>
+              <div className="flex gap-2 mt-3">
+                <StatusBadge status={corridor.status} />
+                <span className="badge bg-orange-100 text-orange-700">Riesgo {corridor.risk}</span>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
