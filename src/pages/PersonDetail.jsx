@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { Lock, MapPin } from "lucide-react";
+import SensitiveField from "../components/SensitiveField";
 import SectionTitle from "../components/SectionTitle";
 import StatusBadge from "../components/StatusBadge";
 import { rescuedPeople } from "../data/mockData";
@@ -32,7 +33,10 @@ export default function PersonDetail() {
             <Info label="Equipo de rescate" value={person.team} />
             <Info label="Responsable" value={person.rescuer} />
             <Info label="Trasladado a" value={person.currentPlace} />
-            <Info label="Coordenadas" value={person.isMinor ? "Informacion protegida" : person.coordinates} />
+            <SensitiveField label="Coordenadas exactas" value={person.coordinates} />
+          </div>
+          <div className="rounded-2xl bg-blue-50 border border-blue-100 p-4 text-sm text-blue-800">
+            Vista publica: documentos, direccion exacta, datos medicos completos y coordenadas permanecen protegidos. Cada acceso sensible debe registrarse en auditoria.
           </div>
           <div>
             <h2 className="font-black mb-3 flex items-center gap-2"><MapPin size={18} /> Historial</h2>

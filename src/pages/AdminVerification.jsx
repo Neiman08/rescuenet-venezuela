@@ -17,6 +17,14 @@ const tasks = [
   "Ver logs de auditoria",
 ];
 
+const securityControls = [
+  "Menores: fotos y ubicacion exacta protegidas",
+  "Documentos: nunca visibles al publico",
+  "Datos medicos: solo resumen publico",
+  "Coordenadas: solo rescatistas, gobierno y admin",
+  "Accesos sensibles: audit_logs obligatorio",
+];
+
 export default function AdminVerification() {
   return (
     <div className="space-y-6">
@@ -58,6 +66,14 @@ export default function AdminVerification() {
         <p className="text-xs text-slate-500 mt-3">
           {Object.keys(permissions).length} permisos definidos para futura aplicacion server-side, auditoria y control de acceso por rol.
         </p>
+      </div>
+      <div className="card p-5">
+        <h2 className="font-black mb-4">Controles de proteccion de datos</h2>
+        <div className="grid md:grid-cols-5 gap-3">
+          {securityControls.map((control) => (
+            <div key={control} className="p-4 rounded-2xl bg-slate-50 text-sm font-semibold">{control}</div>
+          ))}
+        </div>
       </div>
     </div>
   );

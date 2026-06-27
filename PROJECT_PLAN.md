@@ -47,7 +47,7 @@ Status: Complete
 
 ## Phase 4 - Privacy, Security, and Audit
 
-Status: Planned
+Status: Complete
 
 - Strengthen sensitive-field masking across person, medical, document, and location views.
 - Add mock audit events for every sensitive action.
