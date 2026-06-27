@@ -139,6 +139,8 @@ test("public missing endpoint merges approved publicSafe records without rawPayl
     state: "Miranda",
     municipality: "Guaicaipuro",
     zone: "Los Teques",
+    latitudePrivate: 10.345,
+    longitudePrivate: -67.041,
     publicSafe: {
       fullName: "Informacion protegida",
       recordType: "missing_person",
@@ -155,6 +157,8 @@ test("public missing endpoint merges approved publicSafe records without rawPayl
     assert.equal(response.statusCode, 200);
     const body = response._getJSONData();
     assert.equal(body.data[0].rawPayload, undefined);
+    assert.equal(body.data[0].latitudePrivate, undefined);
+    assert.equal(body.data[0].longitudePrivate, undefined);
     assert.equal(body.data[0].telefono, undefined);
     assert.equal(body.data[0].documento, undefined);
     assert.equal(body.data[0].fullName, "Informacion protegida");

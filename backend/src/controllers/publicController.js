@@ -60,6 +60,12 @@ function withOperationalClassification(resource, recordType) {
   };
 }
 
+function stripInternalPublicFields(record) {
+  if (!record) return record;
+  const { latitudePrivate, longitudePrivate, addressPrivate, contactPrivate, rawPayload, documentPrivate, medicalPrivate, locationPrivate, ...safeRecord } = record;
+  return safeRecord;
+}
+
 async function approvedImportedRecords(recordTypes, take = 500) {
   try {
     const records = await prisma.importedHumanitarianRecord.findMany({
@@ -80,9 +86,9 @@ async function approvedImportedRecords(recordTypes, take = 500) {
         longitudePrivate: record.longitudePrivate,
         verificationStatus: record.verificationStatus,
         };
-        return operationalResourceTypes.has(record.recordType)
+        return stripInternalPublicFields(operationalResourceTypes.has(record.recordType)
           ? withOperationalClassification(publicRecord, record.recordType)
-          : publicRecord;
+          : publicRecord);
       })
       .filter(Boolean);
   } catch {
