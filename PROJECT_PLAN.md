@@ -30,7 +30,7 @@ Status: Complete
 
 ## Phase 2 - Emergency Workflow Hardening
 
-Status: Planned
+Status: Complete
 
 - Add triage queues for emergency reports.
 - Add incident severity, SLA, and dispatch status models.

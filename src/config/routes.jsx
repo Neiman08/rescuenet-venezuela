@@ -5,6 +5,7 @@ import {
   HandCoins,
   LayoutDashboard,
   Map,
+  Radio,
   Settings,
   ShieldCheck,
   Siren,
@@ -16,6 +17,7 @@ import Centers from "../pages/Centers";
 import Dashboard from "../pages/Dashboard";
 import DonationAudit from "../pages/DonationAudit";
 import DonationsOverview from "../pages/DonationsOverview";
+import EmergencyOperations from "../pages/EmergencyOperations";
 import Expenses from "../pages/Expenses";
 import GovernmentPanel from "../pages/GovernmentPanel";
 import InternationalPanel from "../pages/InternationalPanel";
@@ -36,6 +38,7 @@ import { permissions } from "../security/accessControl";
 export const appRoutes = [
   { path: "/", label: "Inicio", navLabel: "Inicio", icon: LayoutDashboard, element: <Dashboard />, permission: permissions.VIEW_PUBLIC_DASHBOARD, priority: "public" },
   { path: "/mapa", label: "Mapa en vivo", navLabel: "Mapa", icon: Map, element: <LiveMap />, permission: permissions.VIEW_PUBLIC_DASHBOARD, priority: "operational" },
+  { path: "/operaciones", label: "Centro de operaciones", navLabel: "Operaciones", icon: Radio, element: <EmergencyOperations />, permission: permissions.MANAGE_RESPONDERS, priority: "critical" },
   { path: "/reportar", label: "Reportar emergencia", navLabel: "Reportar", icon: Siren, element: <ReportEmergency />, permission: permissions.REPORT_EMERGENCY, priority: "critical" },
   { path: "/estoy-a-salvo", label: "Estoy a salvo", element: <SafeReport />, permission: permissions.REPORT_SAFE, priority: "critical" },
   { path: "/buscar-familiar", label: "Buscar familiar", element: <SearchFamily />, permission: permissions.SEARCH_FAMILY, priority: "public" },
