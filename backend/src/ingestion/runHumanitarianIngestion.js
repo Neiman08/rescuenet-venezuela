@@ -21,6 +21,14 @@ export function parseCliArgs(argv = process.argv.slice(2)) {
       options.sources = enabledSources().filter((source) => sourceMatches(source, key));
     } else if (arg.startsWith("--file=")) {
       options.files.push(arg.slice("--file=".length));
+    } else if (arg.startsWith("--max-files=")) {
+      options.maxFiles = Number(arg.slice("--max-files=".length));
+    } else if (arg.startsWith("--max-records=")) {
+      options.maxRecords = Number(arg.slice("--max-records=".length));
+    } else if (arg.startsWith("--batch-size=")) {
+      options.batchSize = Number(arg.slice("--batch-size=".length));
+    } else if (arg.startsWith("--timeout-ms=")) {
+      options.timeoutMs = Number(arg.slice("--timeout-ms=".length));
     }
   }
   options.reportDir = "reports/ingestion";

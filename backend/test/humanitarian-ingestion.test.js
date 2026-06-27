@@ -13,6 +13,7 @@ import { HumanitarianDeduplicationService } from "../src/ingestion/humanitarianD
 import { IngestionPrivacyService } from "../src/ingestion/ingestionPrivacyService.js";
 import { isImportableHumanitarianRecord, isUsefulRawRecord } from "../src/ingestion/ingestionRecordQuality.js";
 import { extractDriveItems, parseHospitalAdmissionText } from "../src/ingestion/googleDriveHospitalAdmissionsConnector.js";
+import { approvePublicSafeRecords } from "../src/ingestion/approvePublicSafeRecords.js";
 import { fetchRescateVenezuela } from "../src/ingestion/rescateVenezuelaConnector.js";
 import { parseCliArgs } from "../src/ingestion/runHumanitarianIngestion.js";
 import { prisma } from "../src/config/prisma.js";
@@ -274,11 +275,15 @@ test("Excel connector parses xlsx rows", async () => {
 });
 
 test("CLI parser supports dry-run, audit-only, source and file filters", () => {
-  const options = parseCliArgs(["--dry-run", "--audit-only", "--source=vzlayuda", "--file=/tmp/sample.xlsx"]);
+  const options = parseCliArgs(["--dry-run", "--audit-only", "--source=vzlayuda", "--file=/tmp/sample.xlsx", "--max-files=50", "--max-records=1000", "--batch-size=100", "--timeout-ms=12000"]);
 
   assert.equal(options.dryRun, true);
   assert.equal(options.auditOnly, true);
   assert.equal(options.files[0], "/tmp/sample.xlsx");
+  assert.equal(options.maxFiles, 50);
+  assert.equal(options.maxRecords, 1000);
+  assert.equal(options.batchSize, 100);
+  assert.equal(options.timeoutMs, 12000);
   assert.equal(options.sources.length, 2);
   assert.equal(options.sources[0].name, "VzlAyuda");
 });
@@ -309,6 +314,19 @@ test("CLI parser supports Google Drive hospital source filter", () => {
 
   assert.equal(options.sources.length, 1);
   assert.equal(options.sources[0].name, "SISMO 2026 VZLA - Google Drive Hospitales");
+});
+
+test("approvePublicSafeRecords does not touch Prisma without DATABASE_URL", async () => {
+  const originalDatabaseUrl = process.env.DATABASE_URL;
+  delete process.env.DATABASE_URL;
+
+  try {
+    const report = await approvePublicSafeRecords({ dryRun: true });
+    assert.equal(report.databaseAvailable, false);
+    assert.equal(report.approved, 0);
+  } finally {
+    if (originalDatabaseUrl) process.env.DATABASE_URL = originalDatabaseUrl;
+  }
 });
 
 test("HumanitarianImporter dry-run reads local files and writes report without DB writes", async () => {

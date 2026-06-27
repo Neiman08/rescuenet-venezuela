@@ -107,34 +107,37 @@ async function existingPeople() {
   }
 }
 
-async function persist(records, source, run, { dryRun = false } = {}) {
+async function persist(records, source, run, { dryRun = false, batchSize = 100 } = {}) {
   if (dryRun) return { imported: 0, updated: 0 };
   if (!hasDatabaseUrl() || !source || !run) return { imported: 0, updated: 0 };
   let updated = 0;
   let imported = 0;
-  for (const record of records) {
-    try {
-      const existing = record.sourceRecordId
-        ? await prisma.importedHumanitarianRecord.findFirst({
-          where: { sourceName: record.sourceName, sourceRecordId: record.sourceRecordId, deletedAt: null },
-        })
-        : null;
-      const data = {
-        ...record,
-        sourceId: source?.id,
-        ingestionRunId: run?.id,
-        capturedAt: new Date(record.capturedAt),
-        duplicateScore: record.duplicateScore,
-      };
-      if (existing) {
-        await prisma.importedHumanitarianRecord.update({ where: { id: existing.id }, data });
-        updated += 1;
-      } else {
-        await prisma.importedHumanitarianRecord.create({ data });
-        imported += 1;
+  for (let offset = 0; offset < records.length; offset += batchSize) {
+    const batch = records.slice(offset, offset + batchSize);
+    for (const record of batch) {
+      try {
+        const existing = record.sourceRecordId
+          ? await prisma.importedHumanitarianRecord.findFirst({
+            where: { sourceName: record.sourceName, sourceRecordId: record.sourceRecordId, deletedAt: null },
+          })
+          : null;
+        const data = {
+          ...record,
+          sourceId: source?.id,
+          ingestionRunId: run?.id,
+          capturedAt: new Date(record.capturedAt),
+          duplicateScore: record.duplicateScore,
+        };
+        if (existing) {
+          await prisma.importedHumanitarianRecord.update({ where: { id: existing.id }, data });
+          updated += 1;
+        } else {
+          await prisma.importedHumanitarianRecord.create({ data });
+          imported += 1;
+        }
+      } catch {
+        break;
       }
-    } catch {
-      break;
     }
   }
   return { imported, updated };
@@ -148,8 +151,14 @@ async function writeImportableReport(report, reportDir = join(process.cwd(), "re
   return path;
 }
 
+function boundedPositiveInteger(value, fallback, max = 10_000) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return fallback;
+  return Math.min(Math.floor(number), max);
+}
+
 export class HumanitarianImporter {
-  static async run({ sources = enabledSources(), files = [], manualRecords = [], manualSourceName = "Manual protected upload", dryRun = false, auditOnly = false, writeReport = true, reportDir } = {}) {
+  static async run({ sources = enabledSources(), files = [], manualRecords = [], manualSourceName = "Manual protected upload", dryRun = false, auditOnly = false, writeReport = true, reportDir, maxFiles, maxRecords, batchSize, timeoutMs } = {}) {
     const finalReport = {
       startedAt: new Date().toISOString(),
       finishedAt: undefined,
@@ -173,6 +182,10 @@ export class HumanitarianImporter {
 
     const existing = dryRun || auditOnly ? [] : await existingPeople();
     const databaseConfigured = hasDatabaseUrl();
+    const recordLimit = boundedPositiveInteger(maxRecords, undefined);
+    const fileLimit = boundedPositiveInteger(maxFiles, undefined);
+    const writeBatchSize = boundedPositiveInteger(batchSize, 100, 1000);
+    const fetchTimeoutMs = boundedPositiveInteger(timeoutMs, undefined, 60_000);
 
     if (dryRun) finalReport.warnings.push("Dry-run enabled: no database writes were attempted.");
     if (auditOnly) finalReport.warnings.push("Audit-only enabled: sources were checked but records were not imported.");
@@ -198,7 +211,12 @@ export class HumanitarianImporter {
       records: manualRecords,
     }] : [];
 
-    for (const source of [...sources, ...fileSources, ...inlineSources]) {
+    for (const source of [...sources, ...fileSources, ...inlineSources].map((source) => ({
+      ...source,
+      ...(recordLimit ? { maxRecords: source.maxRecords || recordLimit } : {}),
+      ...(fileLimit ? { maxFiles: source.maxFiles || fileLimit } : {}),
+      ...(fetchTimeoutMs ? { timeoutMs: source.timeoutMs || fetchTimeoutMs } : {}),
+    }))) {
       const sourceStartedAt = Date.now();
       finalReport.sourcesConsulted += 1;
       const sourceReport = {
@@ -238,12 +256,13 @@ export class HumanitarianImporter {
         sourceReport.extracted = scrape.records.length;
         sourceReport.filesDetected = scrape.files?.length || undefined;
         sourceReport.unparseable = scrape.unparseable || undefined;
-        const normalized = HumanitarianNormalizer.normalizeMany(scrape.records, source).filter(isImportableHumanitarianRecord);
+        const rawRecords = recordLimit ? scrape.records.slice(0, recordLimit) : scrape.records;
+        const normalized = HumanitarianNormalizer.normalizeMany(rawRecords, source).filter(isImportableHumanitarianRecord);
         sourceReport.filteredOut = sourceReport.extracted - normalized.length;
         const deduped = HumanitarianDeduplicationService.mark(normalized, existing);
         const scored = DataQualityScoringService.scoreMany(deduped, source, existing);
         sourceReport.normalized = scored.length;
-        const persisted = await persist(scored, dbSource, run, { dryRun });
+        const persisted = await persist(scored, dbSource, run, { dryRun, batchSize: writeBatchSize });
         sourceReport.imported = persisted.imported;
         sourceReport.updated = persisted.updated;
         sourceReport.possibleDuplicates = scored.filter((record) => record.possibleDuplicate).length;

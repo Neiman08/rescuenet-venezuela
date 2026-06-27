@@ -15,6 +15,7 @@
     "prisma:seed": "node src/prisma/seed.js",
     "prisma:generate": "prisma generate",
     "ingest:humanitarian": "node src/ingestion/runHumanitarianIngestion.js",
+    "approve:public-safe-records": "node src/ingestion/approvePublicSafeRecords.js",
     "seed:verified": "node src/prisma/loadVerifiedEmergencySeed.js"
   },
   "dependencies": {
