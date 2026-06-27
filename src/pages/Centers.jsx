@@ -1,15 +1,37 @@
 import { useEffect, useState } from "react";
+import { PlusCircle } from "lucide-react";
 import DataTable from "../components/DataTable";
 import PublicAccessNotice from "../components/PublicAccessNotice";
 import SectionTitle from "../components/SectionTitle";
-import { demoDataEnabled, noApprovedDataMessage, noRealDataMessage } from "../config/demoData";
-import { centers } from "../data/mockData";
-import { publicApi } from "../lib/api";
+import { noApprovedDataMessage, noRealDataMessage } from "../config/demoData";
+import { friendlyApiError, publicApi } from "../lib/api";
+
+const initialCenterForm = {
+  recordType: "collection_center",
+  name: "",
+  organization: "",
+  country: "Venezuela",
+  state: "",
+  municipality: "",
+  city: "",
+  publicLocation: "",
+  addressPrivate: "",
+  contactPrivate: "",
+  operatingHours: "",
+  acceptedItems: "",
+  capacity: "",
+  occupied: "",
+  operationalStatus: "PENDIENTE_VERIFICACION",
+};
 
 export default function Centers() {
-  const [rows, setRows] = useState(demoDataEnabled ? centers : []);
+  const [rows, setRows] = useState([]);
   const [status, setStatus] = useState("loading");
   const [filters, setFilters] = useState({ country: "", state: "", municipality: "", type: "", operationalStatus: "" });
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(initialCenterForm);
+  const [submitStatus, setSubmitStatus] = useState("idle");
+  const [submitMessage, setSubmitMessage] = useState("");
 
   useEffect(() => {
     publicApi.getHelpCenters()
@@ -23,18 +45,43 @@ export default function Centers() {
           setRows(nextRows);
           setStatus("success");
         } else {
-          setRows(demoDataEnabled ? centers : []);
-          setStatus(demoDataEnabled ? "fallback" : "empty");
+          setRows([]);
+          setStatus("empty");
         }
       })
       .catch(() => {
-        setRows(demoDataEnabled ? centers : []);
-        setStatus(demoDataEnabled ? "fallback" : "error");
+        setRows([]);
+        setStatus("error");
       });
   }, []);
 
   function updateFilter(event) {
     setFilters((current) => ({ ...current, [event.target.name]: event.target.value }));
+  }
+
+  function updateForm(event) {
+    setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  }
+
+  async function submitCenter(event) {
+    event.preventDefault();
+    if (submitStatus === "loading") return;
+    setSubmitStatus("loading");
+    setSubmitMessage("");
+    try {
+      await publicApi.createHelpCenter({
+        ...form,
+        acceptedItems: form.acceptedItems.split(",").map((item) => item.trim()).filter(Boolean),
+        capacity: form.capacity ? Number(form.capacity) : undefined,
+        occupied: form.occupied ? Number(form.occupied) : undefined,
+      });
+      setSubmitStatus("success");
+      setSubmitMessage("Centro recibido. Queda pendiente de revision institucional antes de publicarse.");
+      setForm(initialCenterForm);
+    } catch (error) {
+      setSubmitStatus("error");
+      setSubmitMessage(friendlyApiError(error));
+    }
   }
 
   const countries = [...new Set(rows.map((row) => row.country).filter(Boolean))];
@@ -59,11 +106,43 @@ export default function Centers() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Centros de ayuda" subtitle="Refugios, hospitales y centros de acopio vinculados a zonas afectadas." />
+      <SectionTitle
+        title="Centros de ayuda"
+        subtitle="Refugios, hospitales y centros de acopio vinculados a zonas afectadas."
+        action={<button className="btn bg-rescueBlue text-white flex items-center gap-2" onClick={() => setShowForm((value) => !value)}><PlusCircle size={18} /> Registrar centro</button>}
+      />
       <PublicAccessNotice text="No necesitas crear cuenta para consultar refugios, hospitales o centros de ayuda." />
-      {status === "fallback" && <div className="rounded-2xl bg-yellow-50 p-4 text-sm font-semibold text-yellow-800">No pudimos conectar con centros publicos del backend. Mostrando datos simulados locales.</div>}
       {status === "error" && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>}
       {status === "empty" && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noApprovedDataMessage}</div>}
+      {showForm && (
+        <form onSubmit={submitCenter} className="card p-5 grid md:grid-cols-3 gap-3">
+          <select className="input" name="recordType" value={form.recordType} onChange={updateForm}>
+            <option value="hospital">Hospital</option>
+            <option value="shelter">Refugio</option>
+            <option value="collection_center">Centro de acopio</option>
+            <option value="medical_point">Punto medico</option>
+            <option value="water_point">Agua</option>
+            <option value="food_point">Alimentos</option>
+            <option value="pet_aid_center">Mascotas</option>
+            <option value="logistics_center">Logistica</option>
+          </select>
+          <input className="input" name="name" value={form.name} onChange={updateForm} placeholder="Nombre" required />
+          <input className="input" name="organization" value={form.organization} onChange={updateForm} placeholder="Organizacion" />
+          <input className="input" name="country" value={form.country} onChange={updateForm} placeholder="Pais" />
+          <input className="input" name="state" value={form.state} onChange={updateForm} placeholder="Estado" />
+          <input className="input" name="municipality" value={form.municipality} onChange={updateForm} placeholder="Municipio" />
+          <input className="input" name="city" value={form.city} onChange={updateForm} placeholder="Ciudad" />
+          <input className="input" name="publicLocation" value={form.publicLocation} onChange={updateForm} placeholder="Ubicacion publica" required />
+          <input className="input" name="operatingHours" value={form.operatingHours} onChange={updateForm} placeholder="Horarios" />
+          <input className="input" name="acceptedItems" value={form.acceptedItems} onChange={updateForm} placeholder="Articulos aceptados, separados por coma" />
+          <input className="input" name="capacity" value={form.capacity} onChange={updateForm} placeholder="Capacidad" />
+          <input className="input" name="occupied" value={form.occupied} onChange={updateForm} placeholder="Ocupados" />
+          <input className="input md:col-span-2" name="addressPrivate" value={form.addressPrivate} onChange={updateForm} placeholder="Direccion exacta privada" />
+          <input className="input" name="contactPrivate" value={form.contactPrivate} onChange={updateForm} placeholder="Contacto privado" />
+          {submitMessage && <div className={`md:col-span-3 rounded-2xl p-4 text-sm font-semibold ${submitStatus === "success" ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>{submitMessage}</div>}
+          <button className="btn bg-navy text-white md:col-span-3" disabled={submitStatus === "loading"}>{submitStatus === "loading" ? "Registrando..." : "Registrar y dejar pendiente de revision"}</button>
+        </form>
+      )}
       <div className="card p-5 grid md:grid-cols-5 gap-3">
         <select className="input" name="country" value={filters.country} onChange={updateFilter}>
           <option value="">Todos los paises</option>
@@ -135,6 +214,8 @@ function labelForType(type) {
     medical_point: "Medicina",
     volunteer_center: "Voluntariado",
     donation_need: "Necesidad urgente",
+    pet_aid_center: "Mascotas",
+    logistics_center: "Logistica",
   };
   return labels[type] || type || "Centro";
 }

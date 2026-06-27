@@ -84,6 +84,73 @@ test("public emergency submission rejects unknown affected zones without token",
   }
 });
 
+test("public help center submission creates pending record without exposing private fields", async () => {
+  const originalCreate = prisma.importedHumanitarianRecord.create;
+  const originalAuditCreate = prisma.auditLog.create;
+  prisma.importedHumanitarianRecord.create = async ({ data }) => ({
+    id: "center-public-1",
+    recordType: data.recordType,
+    publicSafe: data.publicSafe,
+  });
+  prisma.auditLog.create = async () => ({ id: "audit-1" });
+
+  try {
+    const response = await dispatch(createApp(), {
+      method: "POST",
+      url: "/api/help-centers",
+      body: {
+        recordType: "collection_center",
+        name: "Centro de Acopio Comunitario",
+        publicLocation: "Los Teques",
+        addressPrivate: "Calle exacta casa 12",
+        contactPrivate: "04121234567",
+        acceptedItems: ["agua", "alimentos"],
+      },
+    });
+    assert.equal(response.statusCode, 201);
+    const body = response._getJSONData();
+    assert.equal(body.data.status, "pending_review");
+    assert.equal(JSON.stringify(body).includes("0412"), false);
+    assert.equal(JSON.stringify(body).includes("Calle exacta"), false);
+  } finally {
+    prisma.importedHumanitarianRecord.create = originalCreate;
+    prisma.auditLog.create = originalAuditCreate;
+  }
+});
+
+test("public logistics submission creates pending record without exposing contact", async () => {
+  const originalCreate = prisma.importedHumanitarianRecord.create;
+  const originalAuditCreate = prisma.auditLog.create;
+  prisma.importedHumanitarianRecord.create = async ({ data }) => ({
+    id: "log-public-1",
+    recordType: data.recordType,
+    publicSafe: data.publicSafe,
+  });
+  prisma.auditLog.create = async () => ({ id: "audit-1" });
+
+  try {
+    const response = await dispatch(createApp(), {
+      method: "POST",
+      url: "/api/logistics/public",
+      body: {
+        itemType: "water",
+        requester: "Comunidad Los Teques",
+        publicLocation: "Los Teques",
+        quantity: "500 litros",
+        contactPrivate: "contacto interno 04121234567",
+      },
+    });
+    assert.equal(response.statusCode, 201);
+    const body = response._getJSONData();
+    assert.equal(body.data.status, "pending_review");
+    assert.equal(JSON.stringify(body).includes("0412"), false);
+    assert.equal(body.data.publicSafe.itemType, "water");
+  } finally {
+    prisma.importedHumanitarianRecord.create = originalCreate;
+    prisma.auditLog.create = originalAuditCreate;
+  }
+});
+
 test("protected emergency route rejects requests without token", async () => {
   const response = await dispatch(createApp(), { url: "/api/emergency" });
   assert.equal(response.statusCode, 401);

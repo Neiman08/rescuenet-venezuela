@@ -2,11 +2,24 @@ import { useEffect, useState } from "react";
 import { Building2, Car, Droplet, HeartPulse, Home, Pill, Siren, UserRound, Utensils } from "lucide-react";
 import PublicAccessNotice from "../components/PublicAccessNotice";
 import SectionTitle from "../components/SectionTitle";
-import { emergencyTypes } from "../data/mockData";
 import { friendlyApiError, publicApi } from "../lib/api";
 import { usePublicAffectedZones, zoneLabel } from "../hooks/usePublicAffectedZones";
 
 const icons = [Siren, HeartPulse, UserRound, Droplet, Utensils, Pill, Home, Building2, Car];
+const emergencyTypes = [
+  { id: "missing_person", label: "Persona desaparecida" },
+  { id: "safe_person", label: "Persona localizada" },
+  { id: "hospitalized_person", label: "Hospitalizado" },
+  { id: "rescued_person", label: "Rescatado" },
+  { id: "collapsed_building", label: "Edificio colapsado" },
+  { id: "trapped_person", label: "Persona atrapada" },
+  { id: "medical_need", label: "Necesidad medica" },
+  { id: "water_need", label: "Falta de agua" },
+  { id: "food_need", label: "Falta de alimentos" },
+  { id: "collection_center", label: "Centro de acopio" },
+  { id: "shelter", label: "Refugio" },
+  { id: "closed_road", label: "Carretera cerrada" },
+];
 
 export default function ReportEmergency() {
   const { zones, status: zonesStatus, ready: zonesReady } = usePublicAffectedZones();

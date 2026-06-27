@@ -7,29 +7,31 @@ import { noApprovedDataMessage, noRealDataMessage } from "../config/demoData";
 import { publicApi } from "../lib/api";
 
 const groups = [
-  { key: "missing", title: "Desaparecidos", loader: publicApi.getMissingReports },
-  { key: "hospitalized", title: "Hospitalizados", loader: publicApi.getHospitalized },
-  { key: "rescued", title: "Rescatados", loader: publicApi.getRescued },
-  { key: "safe", title: "A salvo", loader: publicApi.getSafeReports },
+  { key: "missing", title: "Desaparecidos", typeLabel: "Desaparecido", loader: publicApi.getMissingReports },
+  { key: "hospitalized", title: "Hospitalizados", typeLabel: "Hospitalizado", loader: publicApi.getHospitalized },
+  { key: "rescued", title: "Rescatados", typeLabel: "Rescatado", loader: publicApi.getRescued },
+  { key: "safe", title: "Localizados / A salvo", typeLabel: "A salvo", loader: publicApi.getSafeReports },
 ];
 
 function normalizePerson(item, fallbackType) {
+  const group = groups.find((entry) => entry.key === fallbackType);
   return {
     id: item.code || item.id,
     name: item.name || item.fullName || "Informacion protegida",
-    type: item.type || item.recordType || fallbackType,
+    type: group?.typeLabel || item.type || item.recordType || fallbackType,
     age: item.age || item.approximateAge || "No indicada",
     sex: item.sex || item.gender || "No indicado",
     publicLocation: item.publicLocation || item.currentPlace || item.lastSeenPlace || item.zone || "Zona no indicada",
     hospital: item.hospital || item.hospitalName || "No indicado",
     status: item.status || item.verificationStatus || "Por verificar",
-    privacy: item.privacyLevel === "restricted" ? "Protegido" : "PublicSafe",
+    source: item.source || item.sourceName || "RescueNet",
   };
 }
 
 export default function RescuedList() {
   const [data, setData] = useState(Object.fromEntries(groups.map((group) => [group.key, []])));
   const [status, setStatus] = useState("loading");
+  const [activeTab, setActiveTab] = useState("hospitalized");
 
   useEffect(() => {
     Promise.allSettled(groups.map((group) => group.loader()))
@@ -48,6 +50,8 @@ export default function RescuedList() {
   }, []);
 
   const total = Object.values(data).reduce((sum, rows) => sum + rows.length, 0);
+  const activeGroup = groups.find((group) => group.key === activeTab) || groups[0];
+  const activeRows = data[activeGroup.key] || [];
 
   return (
     <div className="space-y-6">
@@ -58,31 +62,40 @@ export default function RescuedList() {
       />
       {status === "error" && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>}
       {status === "success" && total === 0 && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noApprovedDataMessage}</div>}
-      {groups.map((group) => (
-        <section key={group.key} className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-black text-lg">{group.title}</h2>
-            <span className="badge bg-blue-100 text-blue-700">{data[group.key]?.length || 0}</span>
-          </div>
-          {data[group.key]?.length ? (
-            <DataTable
-              columns={[
-                { key: "id", label: "Codigo" },
-                { key: "name", label: "Nombre" },
-                { key: "age", label: "Edad" },
-                { key: "sex", label: "Sexo" },
-                { key: "publicLocation", label: "Zona publica" },
-                { key: "hospital", label: "Hospital" },
-                { key: "status", label: "Estado", badge: true },
-                { key: "privacy", label: "Privacidad" },
-              ]}
-              rows={data[group.key]}
-            />
-          ) : (
-            <div className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-600">No hay registros publicos en esta categoria.</div>
-          )}
-        </section>
-      ))}
+      <div className="flex flex-wrap gap-2">
+        {groups.map((group) => (
+          <button
+            key={group.key}
+            type="button"
+            onClick={() => setActiveTab(group.key)}
+            className={`btn border ${activeTab === group.key ? "bg-navy text-white border-navy" : "bg-white text-navy border-slate-200"}`}
+          >
+            {group.title} <span className="ml-2 rounded-full bg-white/20 px-2">{data[group.key]?.length || 0}</span>
+          </button>
+        ))}
+      </div>
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-black text-lg">{activeGroup.title}</h2>
+          <span className="badge bg-blue-100 text-blue-700">{activeRows.length}</span>
+        </div>
+        {activeRows.length ? (
+          <DataTable
+            columns={[
+              { key: "name", label: "Nombre" },
+              { key: "age", label: "Edad" },
+              { key: "sex", label: "Sexo" },
+              { key: "status", label: "Estado", badge: true },
+              { key: "publicLocation", label: "Zona publica" },
+              { key: "type", label: "Tipo" },
+              { key: "source", label: "Fuente" },
+            ]}
+            rows={activeRows}
+          />
+        ) : (
+          <div className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-600">Sin datos reales registrados todavía.</div>
+        )}
+      </section>
     </div>
   );
 }

@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Building2, CheckCircle, Droplet, MessageCircle, Pill, ShieldCheck, Siren, Utensils, Users } from "lucide-react";
+import { Building2, CheckCircle, MessageCircle, ShieldCheck, Siren, Users } from "lucide-react";
 import ActionCard from "../components/ActionCard";
 import StatCard from "../components/StatCard";
 import MapPreview from "../components/MapPreview";
 import StatusBadge from "../components/StatusBadge";
-import { demoDataEnabled, noApprovedDataMessage, noRealDataMessage } from "../config/demoData";
-import { centers, simulationNotice, stats } from "../data/mockData";
+import { noApprovedDataMessage, noRealDataMessage } from "../config/demoData";
 import { publicApi } from "../lib/api";
 
 export default function Dashboard() {
-  const [dashboardStats, setDashboardStats] = useState(demoDataEnabled ? stats : {});
+  const [dashboardStats, setDashboardStats] = useState({});
   const [mapData, setMapData] = useState({ zones: [], reports: [] });
-  const [helpCenters, setHelpCenters] = useState(demoDataEnabled ? centers : []);
+  const [helpCenters, setHelpCenters] = useState([]);
+  const [urgentNeeds, setUrgentNeeds] = useState([]);
   const [status, setStatus] = useState("loading");
 
   useEffect(() => {
@@ -26,25 +26,26 @@ export default function Dashboard() {
             ...(help.value.shelters || []).map((item) => ({ ...item, type: "Refugio", zone: item.affectedZone?.sector || "Zona no indicada" })),
             ...(help.value.imported || []).map((item) => ({ ...item, type: item.recordType, zone: item.publicLocation || item.zone || "Zona no indicada", capacity: item.capacity || 0, occupied: item.occupied || 0 })),
           ];
-          setHelpCenters(nextCenters.length ? nextCenters : demoDataEnabled ? centers : []);
+          setHelpCenters(nextCenters);
+          setUrgentNeeds(nextCenters.filter((item) => item.recordType === "donation_need" || item.type === "donation_need").slice(0, 3));
         }
         const hasRealData = dashboard.status === "fulfilled" || map.status === "fulfilled" || help.status === "fulfilled";
-        setStatus(hasRealData ? "success" : demoDataEnabled ? "fallback" : "error");
+        setStatus(hasRealData ? "success" : "error");
       })
-      .catch(() => setStatus(demoDataEnabled ? "fallback" : "error"));
+      .catch(() => setStatus("error"));
   }, []);
 
   return (
     <div className="space-y-6">
       {status === "error" && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>}
-      {!demoDataEnabled && status === "success" && !Object.keys(dashboardStats).length && !mapData.zones.length && !helpCenters.length && (
+      {status === "success" && !Object.keys(dashboardStats).length && !mapData.zones.length && !helpCenters.length && (
         <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noApprovedDataMessage}</div>
       )}
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 rounded-3xl overflow-hidden bg-navy text-white shadow-card relative min-h-[460px]">
           <div className="absolute inset-0 opacity-25 bg-[url('https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?w=1200&auto=format&fit=crop')] bg-cover bg-center" />
           <div className="relative p-6 md:p-8">
-            <StatusBadge status={demoDataEnabled && status === "fallback" ? "Demo" : "Datos reales"} />
+            <StatusBadge status="Datos reales" />
             <h1 className="text-3xl md:text-4xl font-black max-w-xl mt-4">Juntos salvamos vidas</h1>
             <p className="text-blue-100 mt-3 max-w-xl">
               Plataforma unificada de emergencia, rescate y ayuda humanitaria para las zonas afectadas por el terremoto.
@@ -71,7 +72,6 @@ export default function Dashboard() {
               Futuro bot para emergencias, ubicacion, fotos, audio, busqueda familiar, estado seguro y refugios cercanos.
             </p>
           </div>
-          {demoDataEnabled && <p className="text-xs text-slate-500 mt-4">{simulationNotice}</p>}
           <div className="mt-5 space-y-3">
             <Link to="/mapa" className="btn bg-blue-600 text-white block text-center">Ver mapa en vivo</Link>
             <Link to="/operaciones" className="btn bg-navy text-white block text-center">Centro de operaciones</Link>
@@ -85,7 +85,9 @@ export default function Dashboard() {
         <StatCard title="Desaparecidos" value={(dashboardStats.missingPeople || 0).toLocaleString()} color="red" icon={<Siren />} />
         <StatCard title="Hospitalizados" value={(dashboardStats.hospitalizedPeople || 0).toLocaleString()} color="blue" icon={<ShieldCheck />} />
         <StatCard title="Rescatados" value={(dashboardStats.rescuedPeople || 0).toLocaleString()} color="green" icon={<CheckCircle />} />
-        <StatCard title="Personas publicas" value={(dashboardStats.publicPeopleTotal || dashboardStats.registeredPeople || 0).toLocaleString()} color="purple" icon={<Building2 />} />
+        <StatCard title="Centros activos" value={(dashboardStats.activeCenters || 0).toLocaleString()} color="purple" icon={<Building2 />} />
+        <StatCard title="Reportes pendientes" value={(dashboardStats.pendingReports || 0).toLocaleString()} color="orange" icon={<Siren />} />
+        <StatCard title="Incidentes criticos" value={(dashboardStats.criticalIncidents || 0).toLocaleString()} color="red" icon={<ShieldCheck />} />
       </section>
 
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -99,22 +101,15 @@ export default function Dashboard() {
         <div className="card p-5">
           <h2 className="font-black text-lg mb-4">Necesidades urgentes</h2>
           <div className="space-y-4">
-            {[
-              ["Agua potable", "Los Teques, La Vega", Droplet, "text-blue-600"],
-              ["Medicinas", "Maracay, Valencia", Pill, "text-purple-600"],
-              ["Alimentos", "Refugios activos", Utensils, "text-orange-600"],
-            ].map(([title, zone, Icon, className]) => (
-              <div key={title} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50">
-                <div className="w-11 h-11 rounded-xl bg-white flex items-center justify-center">
-                  <Icon className={className} />
-                </div>
+            {urgentNeeds.length ? urgentNeeds.map((need) => (
+              <div key={need.id || need.name} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50">
                 <div className="flex-1">
-                  <p className="font-bold">{title}</p>
-                  <p className="text-xs text-slate-500">{zone}</p>
+                  <p className="font-bold">{need.name || need.itemType || "Necesidad urgente"}</p>
+                  <p className="text-xs text-slate-500">{need.publicLocation || need.zone}</p>
                 </div>
-                <span className="text-xs font-bold text-red-600">Muy urgente</span>
+                <span className="text-xs font-bold text-red-600">{need.priority || need.operationalStatus || "Pendiente"}</span>
               </div>
-            ))}
+            )) : <div className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-600">{noApprovedDataMessage}</div>}
           </div>
         </div>
       </section>

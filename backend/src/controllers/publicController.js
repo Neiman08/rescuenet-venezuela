@@ -29,6 +29,10 @@ function withoutAntiSpamFields(payload) {
   return body;
 }
 
+function compactObject(object) {
+  return Object.fromEntries(Object.entries(object).filter(([, value]) => value !== undefined && value !== ""));
+}
+
 async function ensureActiveAffectedZone(id) {
   const zone = await prisma.affectedZone.findFirst({ where: { id, deletedAt: null } });
   if (!zone) throw new AppError("Affected zone is not available for public reporting", 400, "INVALID_AFFECTED_ZONE");
@@ -107,6 +111,8 @@ async function approvedImportedRecords(recordTypes, take = 500) {
 const publicCenterTypes = ["collection_center", "shelter", "hospital", "help_center", "water_point", "food_point", "medical_point", "volunteer_center", "pet_aid_center", "logistics_center", "donation_need"];
 const familySearchTypes = ["missing_person", "hospitalized_person", "trapped_person", "safe_person", "rescued_person"];
 const operationalResourceTypes = new Set([...publicCenterTypes, "hospital"]);
+const centerTypes = new Set(["hospital", "shelter", "collection_center", "medical_point", "water_point", "food_point", "pet_aid_center", "logistics_center", "help_center"]);
+const logisticsTypes = new Set(["water", "food", "medicine", "fuel", "transport", "generator", "mattress", "medical_supply"]);
 
 function queryText(value) {
   return String(value || "").trim();
@@ -215,6 +221,43 @@ export const publicSchemas = {
       lastSeenPlace: z.string().optional(),
       consentPublic: z.boolean().default(false),
       isMinor: z.boolean().default(false),
+      website: z.string().optional(),
+      url: z.string().optional(),
+    }),
+  }),
+  helpCenter: z.object({
+    body: z.object({
+      recordType: z.enum(["hospital", "shelter", "collection_center", "medical_point", "water_point", "food_point", "pet_aid_center", "logistics_center", "help_center"]),
+      name: z.string().min(2),
+      organization: z.string().optional(),
+      country: z.string().optional(),
+      state: z.string().optional(),
+      municipality: z.string().optional(),
+      city: z.string().optional(),
+      publicLocation: z.string().min(2),
+      addressPrivate: z.string().optional(),
+      contactPrivate: z.string().optional(),
+      operatingHours: z.string().optional(),
+      acceptedItems: z.array(z.string()).default([]),
+      capacity: z.coerce.number().int().min(0).optional(),
+      occupied: z.coerce.number().int().min(0).optional(),
+      operationalStatus: z.string().default("PENDIENTE_VERIFICACION"),
+      website: z.string().optional(),
+      url: z.string().optional(),
+    }),
+  }),
+  logisticsRequest: z.object({
+    body: z.object({
+      itemType: z.enum(["water", "food", "medicine", "fuel", "transport", "generator", "mattress", "medical_supply"]),
+      requester: z.string().min(2),
+      organization: z.string().optional(),
+      state: z.string().optional(),
+      municipality: z.string().optional(),
+      publicLocation: z.string().min(2),
+      quantity: z.string().optional(),
+      priority: z.string().default("PENDIENTE"),
+      notes: z.string().optional(),
+      contactPrivate: z.string().optional(),
       website: z.string().optional(),
       url: z.string().optional(),
     }),
@@ -383,13 +426,15 @@ export const publicController = {
   publicDashboard: asyncHandler(async (_req, res) => {
     const overview = await DashboardService.overview();
     const helpCenters = await approvedImportedRecords(publicCenterTypes);
-    const [hospitals, shelters, missing, safe, rescued, admissions, importedMissing, importedSafe, importedRescued, importedHospitalized, importedTrapped] = await Promise.all([
+    const [hospitals, shelters, missing, safe, rescued, admissions, pendingEmergencies, criticalEmergencies, importedMissing, importedSafe, importedRescued, importedHospitalized, importedTrapped] = await Promise.all([
       prisma.hospital.findMany({ where: { deletedAt: null }, include: { affectedZone: true } }),
       prisma.shelter.findMany({ where: { deletedAt: null }, include: { affectedZone: true } }),
       prisma.missingPersonReport.count({ where: { deletedAt: null } }),
       prisma.safeReport.count({ where: { deletedAt: null } }),
       prisma.rescuedPerson.count({ where: { deletedAt: null } }),
       prisma.hospitalAdmission.count({ where: { deletedAt: null, verified: true } }),
+      prisma.emergencyReport.count({ where: { deletedAt: null, verificationStatus: "pending_review" } }),
+      prisma.emergencyReport.count({ where: { deletedAt: null, OR: [{ priority: "CRITICA" }, { type: { contains: "atrap", mode: "insensitive" } }, { type: { contains: "colaps", mode: "insensitive" } }] } }),
       prisma.importedHumanitarianRecord.count({ where: { deletedAt: null, verificationStatus: "APROBADO", recordType: "missing_person" } }),
       prisma.importedHumanitarianRecord.count({ where: { deletedAt: null, verificationStatus: "APROBADO", recordType: "safe_person" } }),
       prisma.importedHumanitarianRecord.count({ where: { deletedAt: null, verificationStatus: "APROBADO", recordType: "rescued_person" } }),
@@ -417,6 +462,8 @@ export const publicController = {
         trappedPeople: importedTrapped,
         publicPeopleTotal: missingPeople + rescuedPeople + hospitalizedPeople + safePeople,
         registeredPeople: missingPeople + safePeople + rescuedPeople + hospitalizedPeople,
+        pendingReports: pendingEmergencies,
+        criticalIncidents: criticalEmergencies,
         activeCenters: affectedHospitals + affectedShelters + collectionCenters + helpCenters.filter((item) => !["hospital_near_disaster", "shelter", "collection_center"].includes(item.operationalType)).length,
       },
       latestEmergencies: overview.latestEmergencies.map(PublicDataSanitizer.emergency),
@@ -492,6 +539,92 @@ export const publicController = {
       shelters: publicShelters,
       imported: await approvedImportedRecords(publicCenterTypes),
     });
+  }),
+
+  createHelpCenter: asyncHandler(async (req, res) => {
+    const body = withoutAntiSpamFields(req.validated.body);
+    if (!centerTypes.has(body.recordType)) throw new AppError("Unsupported center type", 400, "UNSUPPORTED_CENTER_TYPE");
+    const record = await prisma.importedHumanitarianRecord.create({
+      data: {
+        sourceName: "Public center submission",
+        sourceUrl: "public_web_form",
+        capturedAt: new Date(),
+        sourceRecordId: makeCode("CENTER"),
+        recordType: body.recordType,
+        name: body.name,
+        organization: body.organization,
+        state: body.state,
+        municipality: body.municipality,
+        publicLocation: body.publicLocation,
+        addressPrivate: body.addressPrivate,
+        contactPrivate: body.contactPrivate,
+        acceptedItems: body.acceptedItems || [],
+        operatingHours: body.operatingHours,
+        operationalStatus: body.operationalStatus || "PENDIENTE_VERIFICACION",
+        verificationStatus: "NO_VERIFICADO",
+        privacyLevel: "standard",
+        publicSafe: compactObject({
+          recordType: body.recordType,
+          name: body.name,
+          organization: body.organization,
+          country: body.country,
+          state: body.state,
+          municipality: body.municipality,
+          city: body.city,
+          publicLocation: body.publicLocation,
+          acceptedItems: body.acceptedItems || [],
+          operatingHours: body.operatingHours,
+          operationalStatus: "PENDIENTE_VERIFICACION",
+        }),
+        rawPayload: compactObject({
+          ...body,
+          contactPrivate: body.contactPrivate ? "[protected]" : undefined,
+          addressPrivate: body.addressPrivate ? "[protected]" : undefined,
+        }),
+      },
+    });
+    await AuditService.record({ action: "public_submission", module: "help_centers", result: "SUCCESS", ip: req.ip, metadata: { id: record.id, recordType: record.recordType, captcha: req.captcha } });
+    res.status(201).json({ data: { id: record.id, status: "pending_review", publicSafe: record.publicSafe } });
+  }),
+
+  createLogisticsRequest: asyncHandler(async (req, res) => {
+    const body = withoutAntiSpamFields(req.validated.body);
+    if (!logisticsTypes.has(body.itemType)) throw new AppError("Unsupported logistics item type", 400, "UNSUPPORTED_LOGISTICS_TYPE");
+    const record = await prisma.importedHumanitarianRecord.create({
+      data: {
+        sourceName: "Public logistics request",
+        sourceUrl: "public_web_form",
+        capturedAt: new Date(),
+        sourceRecordId: makeCode("LOG"),
+        recordType: "donation_need",
+        name: body.itemType,
+        organization: body.organization || body.requester,
+        state: body.state,
+        municipality: body.municipality,
+        publicLocation: body.publicLocation,
+        contactPrivate: body.contactPrivate,
+        acceptedItems: [body.itemType, body.quantity].filter(Boolean),
+        operationalStatus: body.priority || "PENDIENTE",
+        description: body.notes,
+        verificationStatus: "NO_VERIFICADO",
+        privacyLevel: "standard",
+        publicSafe: compactObject({
+          recordType: "donation_need",
+          itemType: body.itemType,
+          requester: body.requester,
+          organization: body.organization,
+          state: body.state,
+          municipality: body.municipality,
+          publicLocation: body.publicLocation,
+          quantity: body.quantity,
+          priority: body.priority,
+          operationalStatus: "PENDIENTE_VERIFICACION",
+        }),
+        rawPayload: compactObject({ ...body, contactPrivate: body.contactPrivate ? "[protected]" : undefined }),
+      },
+    });
+    await AuditService.record({ action: "public_submission", module: "logistics", result: "SUCCESS", ip: req.ip, metadata: { id: record.id, itemType: body.itemType, captcha: req.captcha } });
+    res.status(201).json({ data: { id: record.id, status: "pending_review", publicSafe: record.publicSafe } });
   }),
 
   familySearch: asyncHandler(async (req, res) => {

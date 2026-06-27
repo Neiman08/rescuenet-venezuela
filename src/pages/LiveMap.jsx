@@ -3,38 +3,39 @@ import SectionTitle from "../components/SectionTitle";
 import MapPreview from "../components/MapPreview";
 import PublicAccessNotice from "../components/PublicAccessNotice";
 import StatusBadge from "../components/StatusBadge";
-import { demoDataEnabled, noApprovedDataMessage, noRealDataMessage } from "../config/demoData";
-import { affectedZones } from "../data/affectedZones";
-import { mapReports } from "../data/mockData";
-import { gisLayers, logisticsCorridors } from "../data/gisLayers";
+import { noApprovedDataMessage, noRealDataMessage } from "../config/demoData";
 import { publicApi } from "../lib/api";
 
 export default function LiveMap() {
-  const [zones, setZones] = useState(demoDataEnabled ? affectedZones : []);
-  const [reports, setReports] = useState(demoDataEnabled ? mapReports : []);
+  const [zones, setZones] = useState([]);
+  const [reports, setReports] = useState([]);
   const [status, setStatus] = useState("loading");
 
   useEffect(() => {
     publicApi.getMap()
       .then((payload) => {
         const nextZones = payload?.zones || [];
-        const nextReports = payload?.reports || [];
-        setZones(nextZones.length ? nextZones : demoDataEnabled ? affectedZones : []);
-        setReports(nextReports.length ? nextReports : demoDataEnabled ? mapReports : []);
-        setStatus(nextZones.length || nextReports.length ? "success" : demoDataEnabled ? "fallback" : "empty");
+        const resourceReports = [
+          ...(payload?.hospitals || []).map((item) => ({ id: `hospital-${item.id || item.name}`, type: "Hospital", status: item.status || item.operationalStatus || "Operativo", zone: item.affectedZone?.sector || item.publicLocation, affectedZone: item.affectedZone || item.affectedOperationalZone, color: "blue" })),
+          ...(payload?.shelters || []).map((item) => ({ id: `shelter-${item.id || item.name}`, type: "Refugio", status: item.status || item.operationalStatus || "Operativo", zone: item.affectedZone?.sector || item.publicLocation, affectedZone: item.affectedZone || item.affectedOperationalZone, color: "green" })),
+          ...(payload?.helpCenters || []).map((item) => ({ id: `center-${item.id || item.name}`, type: item.recordType || "Centro de ayuda", status: item.operationalStatus || "Aprobado", zone: item.publicLocation || item.zone, affectedZone: item.affectedOperationalZone, color: "purple" })),
+        ];
+        const nextReports = [...(payload?.reports || []), ...resourceReports];
+        setZones(nextZones);
+        setReports(nextReports);
+        setStatus(nextZones.length || nextReports.length ? "success" : "empty");
       })
       .catch(() => {
-        setZones(demoDataEnabled ? affectedZones : []);
-        setReports(demoDataEnabled ? mapReports : []);
-        setStatus(demoDataEnabled ? "fallback" : "error");
+        setZones([]);
+        setReports([]);
+        setStatus("error");
       });
   }, []);
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Mapa en vivo" subtitle="Zonas afectadas, radios de impacto y reportes operativos simulados." />
+      <SectionTitle title="Mapa en vivo" subtitle="Zonas afectadas, hospitales, refugios, centros y reportes publicos reales." />
       <PublicAccessNotice text="No necesitas crear cuenta para ver el mapa publico y ubicar ayuda cercana." />
-      {status === "fallback" && <div className="rounded-2xl bg-yellow-50 p-4 text-sm font-semibold text-yellow-800">No pudimos conectar con el mapa publico del backend. Mostrando datos simulados locales.</div>}
       {status === "error" && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>}
       {status === "empty" && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noApprovedDataMessage}</div>}
       <div className="grid xl:grid-cols-[320px_1fr] gap-6">
@@ -55,7 +56,11 @@ export default function LiveMap() {
           </div>
           <h2 className="font-black text-lg pt-2">Capas GIS</h2>
           <div className="space-y-2">
-            {gisLayers.map((layer) => (
+            {[
+              { id: "affected_zones", label: "Zonas afectadas", status: `${zones.length} reales` },
+              { id: "incident_markers", label: "Reportes e incidentes", status: `${reports.filter((item) => !["Hospital", "Refugio"].includes(item.type)).length} reales` },
+              { id: "shelters_hospitals", label: "Refugios, hospitales y centros", status: `${reports.filter((item) => ["Hospital", "Refugio"].includes(item.type) || item.type?.includes("center")).length} reales` },
+            ].map((layer) => (
               <label key={layer.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-sm">
                 <input type="checkbox" defaultChecked={layer.visible} />
                 <span className="font-semibold flex-1">{layer.label}</span>
@@ -79,21 +84,6 @@ export default function LiveMap() {
             </div>
           </div>
         ))}
-      </div>
-      <div className="card p-5">
-        <h2 className="font-black mb-4">Corredores logisticos</h2>
-        <div className="grid md:grid-cols-3 gap-4">
-          {logisticsCorridors.map((corridor) => (
-            <div key={corridor.id} className="p-4 rounded-2xl bg-slate-50">
-              <p className="font-black">{corridor.id}</p>
-              <p className="text-sm text-slate-600">{corridor.origin} - {corridor.destination}</p>
-              <div className="flex gap-2 mt-3">
-                <StatusBadge status={corridor.status} />
-                <span className="badge bg-orange-100 text-orange-700">Riesgo {corridor.risk}</span>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
