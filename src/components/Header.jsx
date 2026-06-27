@@ -1,5 +1,6 @@
 import { Bell, Menu, Search } from "lucide-react";
 import { affectedZones } from "../data/affectedZones";
+import { roleCatalog } from "../data/roles";
 
 export default function Header() {
   return (
@@ -19,6 +20,11 @@ export default function Header() {
           <option>Todas las zonas afectadas</option>
           {affectedZones.map((z) => (
             <option key={z.id}>{z.sector} - {z.estado}</option>
+          ))}
+        </select>
+        <select className="hidden xl:block input py-2 w-56" defaultValue="coordinador_rescate" aria-label="Rol operativo">
+          {roleCatalog.map((role) => (
+            <option key={role.id} value={role.id}>{role.label}</option>
           ))}
         </select>
         <button className="relative p-2 rounded-xl bg-slate-100" aria-label="Alertas">

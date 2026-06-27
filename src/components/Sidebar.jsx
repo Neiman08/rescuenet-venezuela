@@ -1,38 +1,12 @@
 import { NavLink } from "react-router-dom";
-import {
-  BarChart3,
-  Building2,
-  Globe2,
-  HandCoins,
-  HeartHandshake,
-  LayoutDashboard,
-  Map,
-  Settings,
-  ShieldCheck,
-  Siren,
-  UserCheck,
-  Users,
-} from "lucide-react";
-
-const links = [
-  { to: "/", label: "Inicio", icon: LayoutDashboard },
-  { to: "/mapa", label: "Mapa", icon: Map },
-  { to: "/reportar", label: "Reportar", icon: Siren },
-  { to: "/personas", label: "Personas", icon: Users },
-  { to: "/rescatistas", label: "Rescatistas", icon: ShieldCheck },
-  { to: "/centros", label: "Centros", icon: Building2 },
-  { to: "/donaciones", label: "Donaciones", icon: HandCoins },
-  { to: "/organizaciones", label: "ONG", icon: UserCheck },
-  { to: "/gobierno", label: "Gobierno", icon: BarChart3 },
-  { to: "/internacional", label: "Global", icon: Globe2 },
-  { to: "/admin", label: "Admin", icon: Settings },
-];
+import { HeartHandshake } from "lucide-react";
+import { navigationRoutes } from "../config/routes";
 
 function LinkItem({ link, compact = false }) {
   const Icon = link.icon;
   return (
     <NavLink
-      to={link.to}
+      to={link.path}
       className={({ isActive }) =>
         `flex items-center gap-3 rounded-xl text-sm transition ${
           compact ? "px-3 py-2 flex-col gap-1 text-[11px]" : "px-4 py-3"
@@ -40,7 +14,7 @@ function LinkItem({ link, compact = false }) {
       }
     >
       <Icon size={compact ? 18 : 19} />
-      <span>{link.label}</span>
+      <span>{link.navLabel || link.label}</span>
     </NavLink>
   );
 }
@@ -59,8 +33,8 @@ export default function Sidebar() {
           </div>
         </div>
         <nav className="p-3 flex-1 space-y-1">
-          {links.map((link) => (
-            <LinkItem key={link.to} link={link} />
+          {navigationRoutes.map((link) => (
+            <LinkItem key={link.path} link={link} />
           ))}
         </nav>
         <div className="p-4">
@@ -70,8 +44,8 @@ export default function Sidebar() {
         </div>
       </aside>
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-navy text-white grid grid-cols-5 gap-1 px-2 py-2">
-        {links.slice(0, 5).map((link) => (
-          <LinkItem key={link.to} link={link} compact />
+        {navigationRoutes.slice(0, 5).map((link) => (
+          <LinkItem key={link.path} link={link} compact />
         ))}
       </nav>
     </>

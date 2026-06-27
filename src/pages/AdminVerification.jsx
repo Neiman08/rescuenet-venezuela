@@ -1,7 +1,8 @@
 import DataTable from "../components/DataTable";
 import SectionTitle from "../components/SectionTitle";
 import { auditLogs } from "../data/mockData";
-import { roles } from "../data/roles";
+import { roleCatalog } from "../data/roles";
+import { permissions, rolePermissions } from "../security/accessControl";
 
 const tasks = [
   "Verificar reportes",
@@ -27,7 +28,7 @@ export default function AdminVerification() {
         <div className="card p-5">
           <h2 className="font-black mb-4">Roles preparados</h2>
           <div className="flex flex-wrap gap-2">
-            {roles.map((role) => <span key={role} className="badge bg-slate-100 text-slate-700">{role}</span>)}
+            {roleCatalog.map((role) => <span key={role.id} className="badge bg-slate-100 text-slate-700">{role.label}</span>)}
           </div>
         </div>
         <DataTable columns={[
@@ -36,6 +37,27 @@ export default function AdminVerification() {
           { key: "action", label: "Accion" },
           { key: "level", label: "Riesgo" },
         ]} rows={auditLogs} />
+      </div>
+      <div className="card p-5">
+        <h2 className="font-black mb-4">Matriz de acceso operativo</h2>
+        <DataTable
+          columns={[
+            { key: "role", label: "Rol" },
+            { key: "group", label: "Grupo" },
+            { key: "clearance", label: "Nivel" },
+            { key: "permissions", label: "Permisos" },
+          ]}
+          rows={roleCatalog.map((role) => ({
+            id: role.id,
+            role: role.label,
+            group: role.group,
+            clearance: role.clearance,
+            permissions: (rolePermissions[role.id] || []).length,
+          }))}
+        />
+        <p className="text-xs text-slate-500 mt-3">
+          {Object.keys(permissions).length} permisos definidos para futura aplicacion server-side, auditoria y control de acceso por rol.
+        </p>
       </div>
     </div>
   );
