@@ -23,6 +23,9 @@ export function createApp({ io } = {}) {
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", service: "rescuenet-backend" });
   });
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", service: "rescuenet-backend" });
+  });
 
   app.use("/api", routes);
   app.use(notFoundHandler);
