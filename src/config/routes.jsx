@@ -5,6 +5,7 @@ import {
   HandCoins,
   LayoutDashboard,
   Map,
+  PackageCheck,
   Radio,
   Settings,
   ShieldCheck,
@@ -20,6 +21,7 @@ import DonationsOverview from "../pages/DonationsOverview";
 import EmergencyOperations from "../pages/EmergencyOperations";
 import Expenses from "../pages/Expenses";
 import GovernmentPanel from "../pages/GovernmentPanel";
+import HumanitarianLogistics from "../pages/HumanitarianLogistics";
 import InternationalPanel from "../pages/InternationalPanel";
 import LiveMap from "../pages/LiveMap";
 import MatchResults from "../pages/MatchResults";
@@ -49,6 +51,7 @@ export const appRoutes = [
   { path: "/personas/:id", label: "Detalle de persona", element: <PersonDetail />, permission: permissions.VIEW_RESCUED_PUBLIC, priority: "sensitive" },
   { path: "/coincidencias", label: "Coincidencias", element: <MatchResults />, permission: permissions.SEARCH_FAMILY, priority: "sensitive" },
   { path: "/centros", label: "Centros", navLabel: "Centros", icon: Building2, element: <Centers />, permission: permissions.MANAGE_CENTERS, priority: "operational" },
+  { path: "/logistica", label: "Logistica humanitaria", navLabel: "Logistica", icon: PackageCheck, element: <HumanitarianLogistics />, permission: permissions.MANAGE_LOGISTICS, priority: "humanitarian" },
   { path: "/rescatistas", label: "Rescatistas", navLabel: "Rescatistas", icon: ShieldCheck, element: <RescuersPanel />, permission: permissions.MANAGE_RESPONDERS, priority: "restricted" },
   { path: "/donaciones", label: "Donaciones", navLabel: "Donaciones", icon: HandCoins, element: <DonationsOverview />, permission: permissions.VIEW_DONATIONS, priority: "public" },
   { path: "/organizaciones", label: "Organizaciones", navLabel: "ONG", icon: UserCheck, element: <VerifiedOrganizations />, permission: permissions.VERIFY_ORGANIZATIONS, priority: "humanitarian" },

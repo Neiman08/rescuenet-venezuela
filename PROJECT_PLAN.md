@@ -39,7 +39,7 @@ Status: Complete
 
 ## Phase 3 - Humanitarian Logistics
 
-Status: Planned
+Status: Complete
 
 - Expand inventory, needs, requests, deliveries, and distribution tracking.
 - Add shelter/hospital capacity pressure indicators.

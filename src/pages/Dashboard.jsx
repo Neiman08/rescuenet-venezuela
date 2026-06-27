@@ -44,6 +44,7 @@ export default function Dashboard() {
           <div className="mt-5 space-y-3">
             <Link to="/mapa" className="btn bg-blue-600 text-white block text-center">Ver mapa en vivo</Link>
             <Link to="/operaciones" className="btn bg-navy text-white block text-center">Centro de operaciones</Link>
+            <Link to="/logistica" className="btn bg-rescuePurple text-white block text-center">Logistica humanitaria</Link>
             <Link to="/donaciones" className="btn bg-green-600 text-white block text-center">Donar con auditoria</Link>
           </div>
         </div>
