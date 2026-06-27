@@ -10,12 +10,20 @@ import { HumanitarianNormalizer } from "./humanitarianNormalizer.js";
 import { HumanitarianDeduplicationService } from "./humanitarianDeduplicationService.js";
 import { IngestionAuditService } from "./ingestionAuditService.js";
 import { isImportableHumanitarianRecord } from "./ingestionRecordQuality.js";
+import { fetchDesaparecidosTerremoto } from "./desaparecidosTerremotoConnector.js";
+import { fetchEncuentralos } from "./encuentralosConnector.js";
 import { fetchReliefWeb } from "./reliefWebConnector.js";
 import { scrapeRedAyudaVenezuela } from "./redAyudaVenezuelaScraper.js";
+import { fetchTerremotoVenezuela } from "./terremotoVenezuelaConnector.js";
+import { fetchVenezuelaTeBusca } from "./venezuelaTeBuscaConnector.js";
 import { scrapeVzlAyuda } from "./vzlAyudaScraper.js";
 import { auditSourceConnectivity } from "./sourceConnectivityAudit.js";
 
 function scraperFor(source) {
+  if (source.connector === "venezuela_te_busca") return fetchVenezuelaTeBusca;
+  if (source.connector === "desaparecidos_terremoto") return fetchDesaparecidosTerremoto;
+  if (source.connector === "encuentralos") return fetchEncuentralos;
+  if (source.connector === "terremoto_venezuela") return fetchTerremotoVenezuela;
   if (source.connector === "reliefweb_api") return fetchReliefWeb;
   if ((source.priority || []).some((type) => ["collection_center", "help_center", "water_point", "food_point", "medical_point", "volunteer_center"].includes(type))) {
     return fetchCollectionCenterSource;
@@ -131,7 +139,7 @@ async function writeImportableReport(report, reportDir = join(process.cwd(), "re
 }
 
 export class HumanitarianImporter {
-  static async run({ sources = enabledSources(), files = [], dryRun = false, auditOnly = false, writeReport = true, reportDir } = {}) {
+  static async run({ sources = enabledSources(), files = [], manualRecords = [], manualSourceName = "Manual protected upload", dryRun = false, auditOnly = false, writeReport = true, reportDir } = {}) {
     const finalReport = {
       startedAt: new Date().toISOString(),
       finishedAt: undefined,
@@ -166,8 +174,16 @@ export class HumanitarianImporter {
       enabled: true,
       file,
     }));
+    const inlineSources = manualRecords.length ? [{
+      name: manualSourceName,
+      url: "manual-upload",
+      type: "MANUAL",
+      trustLevel: "manual_review_required",
+      enabled: true,
+      records: manualRecords,
+    }] : [];
 
-    for (const source of [...sources, ...fileSources]) {
+    for (const source of [...sources, ...fileSources, ...inlineSources]) {
       const sourceStartedAt = Date.now();
       finalReport.sourcesConsulted += 1;
       const sourceReport = {
@@ -179,7 +195,7 @@ export class HumanitarianImporter {
         imported: 0,
         updated: 0,
         possibleDuplicates: 0,
-        connectivity: source.file ? { ok: true, connector: "file" } : undefined,
+        connectivity: source.file || source.records ? { ok: true, connector: source.file ? "file" : "manual-upload" } : undefined,
         elapsedMs: undefined,
         errors: [],
       };
@@ -199,7 +215,9 @@ export class HumanitarianImporter {
           finalReport.sources.push(sourceReport);
           continue;
         }
-        const scrape = source.file
+        const scrape = source.records
+          ? { kind: "manual-upload", records: source.records }
+          : source.file
           ? { kind: "file", records: await recordsFromFile(source.file) }
           : await scraperFor(source)(source);
         sourceReport.extracted = scrape.records.length;

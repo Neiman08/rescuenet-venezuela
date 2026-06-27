@@ -2,6 +2,14 @@ import { prisma } from "../config/prisma.js";
 import { HumanitarianImporter } from "./humanitarianImporter.js";
 import { enabledSources } from "./sourcesRegistry.js";
 
+function sourceMatches(source, key) {
+  const normalizedName = source.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const aliases = (source.aliases || []).map((alias) => String(alias).toLowerCase().replace(/[^a-z0-9-]/g, ""));
+  const normalizedKey = key.toLowerCase().replace(/[^a-z0-9-]/g, "");
+  if (normalizedKey === "all") return true;
+  return normalizedName.includes(normalizedKey.replace(/-/g, "")) || aliases.includes(normalizedKey);
+}
+
 export function parseCliArgs(argv = process.argv.slice(2)) {
   const options = { dryRun: false, sources: enabledSources(), files: [], writeReport: true };
   for (const arg of argv) {
@@ -10,7 +18,7 @@ export function parseCliArgs(argv = process.argv.slice(2)) {
     else if (arg === "--no-report") options.writeReport = false;
     else if (arg.startsWith("--source=")) {
       const key = arg.split("=")[1].toLowerCase();
-      options.sources = enabledSources().filter((source) => source.name.toLowerCase().replace(/\s+/g, "").includes(key));
+      options.sources = enabledSources().filter((source) => sourceMatches(source, key));
     } else if (arg.startsWith("--file=")) {
       options.files.push(arg.slice("--file=".length));
     }

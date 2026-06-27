@@ -190,6 +190,18 @@ test("CLI parser supports dry-run, audit-only, source and file filters", () => {
   assert.equal(options.sources[0].name, "VzlAyuda");
 });
 
+test("CLI parser supports all-persons real source group", () => {
+  const options = parseCliArgs(["--source=all-persons"]);
+  const names = options.sources.map((item) => item.name);
+
+  assert.equal(names.includes("Venezuela Te Busca"), true);
+  assert.equal(names.includes("Desaparecidos Terremoto Venezuela"), true);
+  assert.equal(names.includes("Encuentralos"), true);
+  assert.equal(names.includes("TerremotoVenezuela.app"), true);
+  assert.equal(names.includes("Red Ayuda Venezuela"), true);
+  assert.equal(names.includes("VzlAyuda"), true);
+});
+
 test("HumanitarianImporter dry-run reads local files and writes report without DB writes", async () => {
   const dir = await mkdtemp(join(tmpdir(), "rescuenet-ingestion-"));
   const file = join(dir, "records.json");
@@ -208,6 +220,23 @@ test("HumanitarianImporter dry-run reads local files and writes report without D
   assert.equal(report.sourcesFailed, 0);
   assert.equal(typeof report.elapsedMs, "number");
   assert.equal(saved.sources[0].records[0].privacyLevel, "restricted");
+});
+
+test("HumanitarianImporter previews manual records without DB writes", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "rescuenet-manual-preview-"));
+  const report = await HumanitarianImporter.run({
+    sources: [],
+    manualRecords: [{ nombre: "Persona Reportada", edad: 33, estado: "desaparecida", zona: "Caracas" }],
+    manualSourceName: "Carga manual prueba",
+    dryRun: true,
+    reportDir: dir,
+  });
+
+  assert.equal(report.recordsExtracted, 1);
+  assert.equal(report.recordsNormalized, 1);
+  assert.equal(report.recordsImported, 0);
+  assert.equal(report.sources[0].sourceName, "Carga manual prueba");
+  assert.equal(report.sources[0].records[0].verificationStatus, "NO_VERIFICADO");
 });
 
 test("HumanitarianImporter no-DB mode produces importable report and warning", async () => {

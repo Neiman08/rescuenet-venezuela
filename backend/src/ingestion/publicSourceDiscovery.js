@@ -11,7 +11,7 @@ function safeJsonParse(value) {
   }
 }
 
-function flattenObjects(value, output = []) {
+export function flattenObjects(value, output = []) {
   if (!value || output.length > 500) return output;
   if (Array.isArray(value)) {
     for (const entry of value) flattenObjects(entry, output);
@@ -36,6 +36,18 @@ export function discoverEmbeddedRecords(html) {
   }
 
   return records;
+}
+
+export function discoverLinks(html, baseUrl) {
+  const links = new Set();
+  for (const match of String(html || "").matchAll(/\b(?:href|src)=["']([^"']+)["']/gi)) {
+    try {
+      links.add(new URL(match[1], baseUrl).toString());
+    } catch {
+      // Ignore malformed external markup.
+    }
+  }
+  return [...links];
 }
 
 export async function fetchPublicSource(source) {
