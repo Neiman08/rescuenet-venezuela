@@ -1,5 +1,6 @@
 import { prisma } from "../config/prisma.js";
 import { HumanitarianImporter } from "../ingestion/humanitarianImporter.js";
+import { enabledSources } from "../ingestion/sourcesRegistry.js";
 import { asyncHandler } from "../utils/AppError.js";
 
 function publicRecord(record) {
@@ -47,9 +48,43 @@ function buildRecordWhere(filters = {}) {
   };
 }
 
+function normalizedSourceKey(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9-]/g, "");
+}
+
+function sourceMatches(source, key) {
+  const normalizedName = source.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const aliases = (source.aliases || []).map(normalizedSourceKey);
+  const normalizedKey = normalizedSourceKey(key);
+  if (normalizedKey === "all") return true;
+  return normalizedName.includes(normalizedKey.replace(/-/g, "")) || aliases.includes(normalizedKey);
+}
+
+function productionSources(sourceKey) {
+  const key = sourceKey || "google-drive-hospitales";
+  return enabledSources().filter((source) => sourceMatches(source, key));
+}
+
 export const ingestionController = {
   run: asyncHandler(async (_req, res) => {
     const report = await HumanitarianImporter.run();
+    res.status(202).json({ data: report });
+  }),
+
+  runProduction: asyncHandler(async (req, res) => {
+    const sources = productionSources(req.body?.source || req.query?.source);
+    if (!sources.length) {
+      res.status(400).json({ error: { message: "No ingestion source matched the requested production source." } });
+      return;
+    }
+    const maxRecords = Math.min(Number(req.body?.maxRecords || req.query?.maxRecords || process.env.GOOGLE_DRIVE_MAX_RECORDS || 10_000), 10_000);
+    const maxFiles = Math.min(Number(req.body?.maxFiles || req.query?.maxFiles || process.env.GOOGLE_DRIVE_MAX_FILES || 250), 250);
+    const timeoutMs = Math.min(Number(req.body?.timeoutMs || req.query?.timeoutMs || process.env.GOOGLE_DRIVE_FETCH_TIMEOUT_MS || 12_000), 30_000);
+    const report = await HumanitarianImporter.run({
+      sources: sources.map((source) => ({ ...source, maxRecords, maxFiles, timeoutMs })),
+      dryRun: req.body?.dryRun === true,
+      writeReport: true,
+    });
     res.status(202).json({ data: report });
   }),
 

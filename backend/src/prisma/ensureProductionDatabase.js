@@ -21,44 +21,39 @@ export async function ensureProductionDatabase() {
   console.log("Ensuring production database schema and minimum operational seed are ready");
   run("npx", ["prisma", "migrate", "deploy"]);
   run("npm", ["run", "prisma:seed"]);
-  await bootstrapPublicPersonRegistry();
+  await bootstrapExistingPublicRecords();
 }
 
-async function bootstrapPublicPersonRegistry() {
-  if (process.env.SKIP_PUBLIC_PERSON_BOOTSTRAP === "true") return;
+async function bootstrapExistingPublicRecords() {
+  if (process.env.ENABLE_PRODUCTION_BOOTSTRAP !== "true") return;
 
   try {
-    const [{ HumanitarianImporter }, { ingestionSources }] = await Promise.all([
-      import("../ingestion/humanitarianImporter.js"),
-      import("../ingestion/sourcesRegistry.js"),
-    ]);
-    const bootstrapSourceNames = new Set([
-      "Rescate Venezuela",
-      "SISMO 2026 VZLA - Google Drive Hospitales",
-    ]);
-    const sources = ingestionSources.filter((source) => bootstrapSourceNames.has(source.name));
-    if (!sources.length) return;
-
-    const report = await HumanitarianImporter.run({ sources, writeReport: false });
+    const maxRecords = Math.min(Number(process.env.MAX_BOOTSTRAP_RECORDS) || 200, 200);
+    const records = await prisma.importedHumanitarianRecord.findMany({
+      where: {
+        deletedAt: null,
+        verificationStatus: "NO_VERIFICADO",
+        recordType: { in: ["missing_person", "safe_person", "rescued_person", "trapped_person"] },
+        privacyLevel: { not: "private_only" },
+      },
+      select: { id: true },
+      orderBy: { capturedAt: "desc" },
+      take: maxRecords,
+    });
+    if (!records.length) return;
     const approved = await prisma.importedHumanitarianRecord.updateMany({
       where: {
-        sourceName: { in: [...bootstrapSourceNames] },
-        deletedAt: null,
-        recordType: { in: ["missing_person", "hospitalized_person", "safe_person", "rescued_person", "trapped_person"] },
-        privacyLevel: { not: "private_only" },
+        id: { in: records.map((record) => record.id) },
       },
       data: { verificationStatus: "APROBADO" },
     });
 
     console.log(JSON.stringify({
-      message: "Public person registry bootstrap completed",
-      sourceNames: [...bootstrapSourceNames],
-      extracted: report.recordsExtracted,
-      imported: report.recordsImported,
-      updated: report.recordsUpdated,
+      message: "Light production bootstrap approved existing public-safe records",
+      maxRecords,
       approvedForPublicSafeDisplay: approved.count,
     }));
   } catch (error) {
-    console.warn(`Public person registry bootstrap skipped: ${error.message}`);
+    console.warn(`Light production bootstrap skipped: ${error.message}`);
   }
 }

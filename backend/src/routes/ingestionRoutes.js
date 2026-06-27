@@ -7,6 +7,7 @@ const router = Router();
 
 router.use(authenticate, requirePermission(PERMISSIONS.INGESTION_MANAGE));
 router.post("/run", ingestionController.run);
+router.post("/run-production", ingestionController.runProduction);
 router.post("/manual-upload", ingestionController.manualUpload);
 router.get("/runs", ingestionController.runs);
 router.get("/records", ingestionController.records);

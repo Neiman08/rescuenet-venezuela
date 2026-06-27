@@ -7,6 +7,17 @@ const DOC_MIME = "application/vnd.google-apps.document";
 const SHEET_MIME = "application/vnd.google-apps.spreadsheet";
 const PDF_MIME = "application/pdf";
 const IMAGE_MIME_PREFIX = "image/";
+const DEFAULT_TIMEOUT_MS = 12_000;
+const DEFAULT_MAX_FILES = 250;
+const DEFAULT_MAX_RECORDS = 10_000;
+
+function numericOption(...values) {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number) && number > 0) return number;
+  }
+  return undefined;
+}
 
 function decodeHtml(value = "") {
   return String(value)
@@ -40,8 +51,11 @@ function downloadUrl(id) {
   return `https://drive.google.com/uc?export=download&id=${id}`;
 }
 
-async function fetchText(url) {
-  const response = await fetch(url, { headers: { "user-agent": "Mozilla/5.0 RescueNet public humanitarian ingestion" } });
+async function fetchText(url, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+  const response = await fetch(url, {
+    headers: { "user-agent": "Mozilla/5.0 RescueNet public humanitarian ingestion" },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
   if (!response.ok) throw new Error(`Google Drive source returned ${response.status}`);
   return response.text();
 }
@@ -129,7 +143,7 @@ function recordFromRow(row, file, index) {
   };
 }
 
-export function parseHospitalAdmissionText(text, file = { id: "text", name: "source", url: undefined }) {
+export function parseHospitalAdmissionText(text, file = { id: "text", name: "source", url: undefined }, { maxRecords = DEFAULT_MAX_RECORDS } = {}) {
   const lines = String(text || "")
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -138,6 +152,7 @@ export function parseHospitalAdmissionText(text, file = { id: "text", name: "sou
   const headerWords = new Set(["n°", "nº", "no", "hospital", "apellidos y nombres", "apellidos", "nombres", "edad"]);
 
   for (let index = 0; index < lines.length; index += 1) {
+    if (records.length >= maxRecords) break;
     const line = lines[index];
     if (!/^\d{1,5}\b/.test(line)) continue;
     const previousLine = lines[index - 1] || "";
@@ -187,29 +202,29 @@ async function parseTabularFile(file, rows) {
   return rows.map((row, index) => recordFromRow(row, file, index + 1)).filter(Boolean);
 }
 
-async function parseDriveFile(file) {
+async function parseDriveFile(file, { timeoutMs = DEFAULT_TIMEOUT_MS, maxRecords = DEFAULT_MAX_RECORDS } = {}) {
   const mime = file.mimeType || "";
   if (mime === FOLDER_MIME) return { records: [], unparseable: [] };
   if (mime === DOC_MIME) {
-    const text = await fetchText(documentExportUrl(file.id));
-    return { records: parseHospitalAdmissionText(text, { ...file, url: documentExportUrl(file.id) }), unparseable: [] };
+    const text = await fetchText(documentExportUrl(file.id), { timeoutMs });
+    return { records: parseHospitalAdmissionText(text, { ...file, url: documentExportUrl(file.id) }, { maxRecords }), unparseable: [] };
   }
   if (mime === SHEET_MIME) {
-    const rows = parseCsv(await fetchText(sheetExportUrl(file.id, "csv")));
-    return { records: await parseTabularFile({ ...file, url: sheetExportUrl(file.id, "csv") }, rows), unparseable: [] };
+    const rows = parseCsv(await fetchText(sheetExportUrl(file.id, "csv"), { timeoutMs }));
+    return { records: (await parseTabularFile({ ...file, url: sheetExportUrl(file.id, "csv") }, rows)).slice(0, maxRecords), unparseable: [] };
   }
   if (mime.includes("spreadsheet") || /\.xlsx?$/i.test(file.name)) {
     const rows = await fetchExcel(downloadUrl(file.id));
     return { records: await parseTabularFile({ ...file, url: downloadUrl(file.id) }, rows), unparseable: [] };
   }
   if (mime.includes("csv") || /\.csv$/i.test(file.name)) {
-    const rows = parseCsv(await fetchText(downloadUrl(file.id)));
-    return { records: await parseTabularFile({ ...file, url: downloadUrl(file.id) }, rows), unparseable: [] };
+    const rows = parseCsv(await fetchText(downloadUrl(file.id), { timeoutMs }));
+    return { records: (await parseTabularFile({ ...file, url: downloadUrl(file.id) }, rows)).slice(0, maxRecords), unparseable: [] };
   }
   if (mime.includes("json") || /\.json$/i.test(file.name)) {
-    const payload = JSON.parse(await fetchText(downloadUrl(file.id)));
+    const payload = JSON.parse(await fetchText(downloadUrl(file.id), { timeoutMs }));
     const rows = Array.isArray(payload) ? payload : payload.records || payload.data || [];
-    return { records: await parseTabularFile({ ...file, url: downloadUrl(file.id) }, rows), unparseable: [] };
+    return { records: (await parseTabularFile({ ...file, url: downloadUrl(file.id) }, rows)).slice(0, maxRecords), unparseable: [] };
   }
   if (mime === PDF_MIME || mime.startsWith(IMAGE_MIME_PREFIX) || /\.(pdf|png|jpe?g|webp)$/i.test(file.name)) {
     return { records: [], unparseable: [{ ...file, reason: "PDF/image detected; OCR is intentionally not performed automatically." }] };
@@ -217,29 +232,33 @@ async function parseDriveFile(file) {
   return { records: [], unparseable: [{ ...file, reason: `Unsupported Google Drive file type: ${mime || "unknown"}` }] };
 }
 
-async function listDriveFolder(url, depth = 0, seen = new Set()) {
+async function listDriveFolder(url, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}, depth = 0, seen = new Set()) {
   if (depth > 3 || seen.has(url)) return [];
   seen.add(url);
-  const html = await fetchText(url);
+  const html = await fetchText(url, { timeoutMs });
   const items = extractDriveItems(html);
   const nested = [];
   for (const item of items.filter((entry) => entry.mimeType === FOLDER_MIME)) {
-    nested.push(...await listDriveFolder(folderUrl(item.id), depth + 1, seen));
+    nested.push(...await listDriveFolder(folderUrl(item.id), { timeoutMs }, depth + 1, seen));
   }
   return [...items, ...nested];
 }
 
 export async function fetchGoogleDriveHospitalAdmissions(source) {
   const rootUrl = source.url || DEFAULT_FOLDER_URL;
-  const files = await listDriveFolder(rootUrl);
+  const timeoutMs = numericOption(source.timeoutMs, process.env.GOOGLE_DRIVE_FETCH_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
+  const maxFiles = numericOption(source.maxFiles, process.env.GOOGLE_DRIVE_MAX_FILES, DEFAULT_MAX_FILES);
+  const maxRecords = numericOption(source.maxRecords, process.env.GOOGLE_DRIVE_MAX_RECORDS, DEFAULT_MAX_RECORDS);
+  const files = (await listDriveFolder(rootUrl, { timeoutMs })).slice(0, maxFiles);
   const records = [];
   const unparseable = [];
 
   for (const file of files) {
+    if (records.length >= maxRecords) break;
     if (file.mimeType === FOLDER_MIME) continue;
     try {
-      const parsed = await parseDriveFile(file);
-      records.push(...parsed.records);
+      const parsed = await parseDriveFile(file, { timeoutMs, maxRecords: maxRecords - records.length });
+      records.push(...parsed.records.slice(0, maxRecords - records.length));
       unparseable.push(...parsed.unparseable);
     } catch (error) {
       unparseable.push({ ...file, reason: error.message });

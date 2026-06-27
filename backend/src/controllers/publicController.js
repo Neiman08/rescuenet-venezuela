@@ -62,7 +62,15 @@ function withOperationalClassification(resource, recordType) {
 
 function stripInternalPublicFields(record) {
   if (!record) return record;
-  const { latitudePrivate, longitudePrivate, addressPrivate, contactPrivate, rawPayload, documentPrivate, medicalPrivate, locationPrivate, ...safeRecord } = record;
+  const safeRecord = { ...record };
+  delete safeRecord.latitudePrivate;
+  delete safeRecord.longitudePrivate;
+  delete safeRecord.addressPrivate;
+  delete safeRecord.contactPrivate;
+  delete safeRecord.rawPayload;
+  delete safeRecord.documentPrivate;
+  delete safeRecord.medicalPrivate;
+  delete safeRecord.locationPrivate;
   return safeRecord;
 }
 
