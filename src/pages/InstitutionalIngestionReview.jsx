@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle, CopyCheck, Play, ShieldAlert, XCircle } from "lucide-react";
+import { CheckCircle, CopyCheck, FileUp, Play, ShieldAlert, XCircle } from "lucide-react";
 import SectionTitle from "../components/SectionTitle";
 import StatusBadge from "../components/StatusBadge";
 import { friendlyApiError, institutionalApi } from "../lib/api";
@@ -13,6 +13,8 @@ export default function InstitutionalIngestionReview() {
   const [runs, setRuns] = useState([]);
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("");
+  const [manualJson, setManualJson] = useState("[\n  {\n    \"nombre\": \"\",\n    \"edad\": \"\",\n    \"estado\": \"desaparecida\",\n    \"zona\": \"\",\n    \"descripcion\": \"\"\n  }\n]");
+  const [manualReport, setManualReport] = useState(null);
 
   const load = useCallback(async () => {
     setStatus("loading");
@@ -49,6 +51,22 @@ export default function InstitutionalIngestionReview() {
     }
   }
 
+  async function manualUpload(dryRun = true) {
+    setMessage("");
+    try {
+      const records = JSON.parse(manualJson);
+      const payload = await institutionalApi.manualUpload({
+        sourceName: "Carga institucional manual",
+        dryRun,
+        records,
+      });
+      setManualReport(payload.data);
+      if (!dryRun) await load();
+    } catch (error) {
+      setMessage(error instanceof SyntaxError ? "El JSON no es valido. Revisa comas, llaves y comillas." : friendlyApiError(error));
+    }
+  }
+
   return (
     <div className="space-y-6">
       <SectionTitle title="Ingesta institucional" subtitle="Revision protegida de registros humanitarios importados desde fuentes publicas." />
@@ -74,6 +92,28 @@ export default function InstitutionalIngestionReview() {
           <Play size={18} /> Ejecutar
         </button>
       </div>
+
+      <section className="card p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-black text-lg">Cargar datos reales</h2>
+            <p className="text-sm text-slate-600">Solo datos verificados o recopilados por instituciones. El preview no guarda en base de datos.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button className="btn bg-slate-800 text-white flex items-center gap-2" onClick={() => manualUpload(true)}><FileUp size={17} /> Preview</button>
+            <button className="btn bg-rescueGreen text-white flex items-center gap-2" onClick={() => manualUpload(false)}><CheckCircle size={17} /> Importar NO VERIFICADO</button>
+          </div>
+        </div>
+        <textarea className="input min-h-48 font-mono text-xs" value={manualJson} onChange={(event) => setManualJson(event.target.value)} />
+        {manualReport && (
+          <div className="grid sm:grid-cols-4 gap-3 text-sm">
+            <div className="rounded-xl bg-slate-50 p-3"><strong>{manualReport.recordsExtracted}</strong><br />extraidos</div>
+            <div className="rounded-xl bg-slate-50 p-3"><strong>{manualReport.recordsNormalized}</strong><br />normalizados</div>
+            <div className="rounded-xl bg-slate-50 p-3"><strong>{manualReport.recordsImported}</strong><br />importados</div>
+            <div className="rounded-xl bg-slate-50 p-3"><strong>{manualReport.possibleDuplicates}</strong><br />duplicados</div>
+          </div>
+        )}
+      </section>
 
       {message && <div className="rounded-2xl bg-red-50 p-4 text-sm font-semibold text-red-800">{message}</div>}
       {status === "loading" && <div className="card p-5 text-sm font-semibold text-slate-600">Cargando registros institucionales...</div>}

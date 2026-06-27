@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:4000/api";
 
 export class ApiError extends Error {
   constructor(message, status, details) {
@@ -45,11 +45,16 @@ export const publicApi = {
   getHospitals: () => request("/hospitals/public"),
   getShelters: () => request("/shelters/public"),
   getDonations: () => request("/donations/public"),
+  searchFamily: (params = {}) => {
+    const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined && value !== "")).toString();
+    return request(`/family-search/public${query ? `?${query}` : ""}`);
+  },
 };
 
 export const institutionalApi = {
   runIngestion: () => request("/ingestion/run", { method: "POST" }),
   getIngestionRuns: () => request("/ingestion/runs"),
+  manualUpload: (body) => request("/ingestion/manual-upload", { method: "POST", body: JSON.stringify(body) }),
   getIngestionRecords: (params = {}) => {
     const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined && value !== "")).toString();
     return request(`/ingestion/records${query ? `?${query}` : ""}`);

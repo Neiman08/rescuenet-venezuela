@@ -14,7 +14,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "node src/prisma/seed.js",
     "prisma:generate": "prisma generate",
-    "ingest:humanitarian": "node src/ingestion/runHumanitarianIngestion.js"
+    "ingest:humanitarian": "node src/ingestion/runHumanitarianIngestion.js",
+    "seed:verified": "node src/prisma/loadVerifiedEmergencySeed.js"
   },
   "dependencies": {
     "@prisma/client": "^6.18.0",

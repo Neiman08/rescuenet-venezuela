@@ -31,6 +31,26 @@ export const ingestionController = {
     res.status(202).json({ data: report });
   }),
 
+  manualUpload: asyncHandler(async (req, res) => {
+    const records = Array.isArray(req.body?.records) ? req.body.records : [];
+    if (!records.length) {
+      res.status(400).json({ error: { message: "Manual upload requires a non-empty records array." } });
+      return;
+    }
+    if (records.length > 1000) {
+      res.status(400).json({ error: { message: "Manual upload accepts up to 1000 records per request." } });
+      return;
+    }
+    const report = await HumanitarianImporter.run({
+      sources: [],
+      manualRecords: records,
+      manualSourceName: req.body?.sourceName || "Manual protected upload",
+      dryRun: req.body?.dryRun !== false,
+      writeReport: true,
+    });
+    res.status(req.body?.dryRun === false ? 201 : 200).json({ data: report });
+  }),
+
   runs: asyncHandler(async (req, res) => {
     const runs = await prisma.ingestionRun.findMany({
       orderBy: { startedAt: "desc" },
