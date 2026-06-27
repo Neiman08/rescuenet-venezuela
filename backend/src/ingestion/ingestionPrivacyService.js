@@ -8,13 +8,6 @@ function maskName(fullName, privacyLevel) {
   return fullName.trim();
 }
 
-function maskContact(value) {
-  if (!value) return undefined;
-  const digits = String(value).replace(/\D/g, "");
-  if (digits.length < 4) return undefined;
-  return `****${digits.slice(-4)}`;
-}
-
 export function stripSensitiveText(value) {
   if (!value) return undefined;
   const text = String(value)
@@ -39,6 +32,9 @@ export class IngestionPrivacyService {
     const privacyLevel = this.privacyLevelFor(record);
     const privateOnly = privacyLevel === "restricted" || privacyLevel === "private_only";
     const zone = [record.zone, record.municipality, record.state].filter(Boolean).join(", ");
+    const building = record.locationPrivate?.edificio || record.rawPayload?.edificio;
+    const publicBuilding = sanitizePublicPlaceText(building);
+    const publicZone = sanitizePublicPlaceText(zone || record.state);
 
     return {
       sourceName: record.sourceName,
@@ -53,12 +49,12 @@ export class IngestionPrivacyService {
       hospitalName: privateOnly ? undefined : record.hospitalName,
       state: record.state,
       municipality: record.municipality,
-      zone: zone || record.state || undefined,
+      building: privateOnly ? undefined : publicBuilding,
+      zone: publicZone,
       lastSeenPlace: sanitizePublicPlaceText(record.lastSeenPlace || zone),
       currentPlace: sanitizePublicPlaceText(record.currentPlace || zone),
       description: privateOnly ? undefined : stripSensitiveText(record.description),
       photoUrl: privateOnly ? undefined : record.photoUrl,
-      contact: maskContact(record.contactInfoPrivate),
       verificationStatus: record.verificationStatus || "NO_VERIFICADO",
       privacyLevel,
       possibleDuplicate: Boolean(record.possibleDuplicate),

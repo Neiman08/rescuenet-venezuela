@@ -13,6 +13,7 @@ import { isImportableHumanitarianRecord } from "./ingestionRecordQuality.js";
 import { fetchDesaparecidosTerremoto } from "./desaparecidosTerremotoConnector.js";
 import { fetchEncuentralos } from "./encuentralosConnector.js";
 import { fetchReliefWeb } from "./reliefWebConnector.js";
+import { fetchRescateVenezuela } from "./rescateVenezuelaConnector.js";
 import { scrapeRedAyudaVenezuela } from "./redAyudaVenezuelaScraper.js";
 import { fetchTerremotoVenezuela } from "./terremotoVenezuelaConnector.js";
 import { fetchVenezuelaTeBusca } from "./venezuelaTeBuscaConnector.js";
@@ -24,6 +25,7 @@ function scraperFor(source) {
   if (source.connector === "desaparecidos_terremoto") return fetchDesaparecidosTerremoto;
   if (source.connector === "encuentralos") return fetchEncuentralos;
   if (source.connector === "terremoto_venezuela") return fetchTerremotoVenezuela;
+  if (source.connector === "rescate_venezuela") return fetchRescateVenezuela;
   if (source.connector === "reliefweb_api") return fetchReliefWeb;
   if ((source.priority || []).some((type) => ["collection_center", "help_center", "water_point", "food_point", "medical_point", "volunteer_center"].includes(type))) {
     return fetchCollectionCenterSource;

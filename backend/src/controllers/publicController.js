@@ -68,7 +68,8 @@ async function approvedImportedRecords(recordTypes, take = 500) {
       take,
     });
     return records
-      .map((record) => withOperationalClassification({
+      .map((record) => {
+        const publicRecord = {
         id: record.id,
         ...record.publicSafe,
         state: record.state || record.publicSafe?.state,
@@ -78,7 +79,11 @@ async function approvedImportedRecords(recordTypes, take = 500) {
         latitudePrivate: record.latitudePrivate,
         longitudePrivate: record.longitudePrivate,
         verificationStatus: record.verificationStatus,
-      }, record.recordType))
+        };
+        return operationalResourceTypes.has(record.recordType)
+          ? withOperationalClassification(publicRecord, record.recordType)
+          : publicRecord;
+      })
       .filter(Boolean);
   } catch {
     return [];
@@ -87,6 +92,7 @@ async function approvedImportedRecords(recordTypes, take = 500) {
 
 const publicCenterTypes = ["collection_center", "shelter", "hospital", "help_center", "water_point", "food_point", "medical_point", "volunteer_center", "donation_need"];
 const familySearchTypes = ["missing_person", "hospitalized_person", "trapped_person", "safe_person", "rescued_person"];
+const operationalResourceTypes = new Set([...publicCenterTypes, "hospital"]);
 
 function queryText(value) {
   return String(value || "").trim();
@@ -95,6 +101,17 @@ function queryText(value) {
 function containsFilter(value) {
   const text = queryText(value);
   return text ? { contains: text, mode: "insensitive" } : undefined;
+}
+
+function normalizeDocument(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function recordDocumentMatches(record, documentQuery) {
+  if (!documentQuery) return true;
+  const normalizedQuery = normalizeDocument(documentQuery);
+  const privateText = JSON.stringify(record.documentPrivate || record.rawPayload || {});
+  return normalizeDocument(privateText).includes(normalizedQuery);
 }
 
 function affectedZoneFilter(state, municipality) {
@@ -283,7 +300,7 @@ export const publicController = {
 
   listPublicHospitals: asyncHandler(async (_req, res) => {
     const records = await prisma.hospital.findMany({ where: { deletedAt: null }, include: { affectedZone: true }, take: 100 });
-    const imported = await approvedImportedRecords(["hospital", "hospitalized_person"]);
+    const imported = await approvedImportedRecords(["hospital"]);
     const hospitals = records
       .filter(isInAffectedOperationalZone)
       .map(PublicDataSanitizer.hospital)
@@ -405,12 +422,13 @@ export const publicController = {
     const municipality = containsFilter(req.query.municipality);
     const hospital = containsFilter(req.query.hospital);
     const status = containsFilter(req.query.status);
+    const documentQuery = req.query.documentNumber || req.query.cedula;
     const take = Math.min(Number(req.query.take) || 100, 200);
 
     const zoneFilter = affectedZoneFilter(state, municipality);
 
     const [missing, safe, rescued, hospitalAdmissions, imported] = await Promise.all([
-      prisma.missingPersonReport.findMany({
+      documentQuery ? Promise.resolve([]) : prisma.missingPersonReport.findMany({
         where: {
           deletedAt: null,
           ...(q ? { OR: [{ fullName: containsFilter(q) }, { description: containsFilter(q) }, { clothing: containsFilter(q) }, { lastSeenPlace: containsFilter(q) }] } : {}),
@@ -421,7 +439,7 @@ export const publicController = {
         orderBy: { createdAt: "desc" },
         take,
       }),
-      prisma.safeReport.findMany({
+      documentQuery ? Promise.resolve([]) : prisma.safeReport.findMany({
         where: {
           deletedAt: null,
           ...(q ? { OR: [{ fullName: containsFilter(q) }, { currentPlace: containsFilter(q) }, { message: containsFilter(q) }] } : {}),
@@ -432,7 +450,7 @@ export const publicController = {
         orderBy: { createdAt: "desc" },
         take,
       }),
-      prisma.rescuedPerson.findMany({
+      documentQuery ? Promise.resolve([]) : prisma.rescuedPerson.findMany({
         where: {
           deletedAt: null,
           ...(q ? { OR: [{ name: containsFilter(q) }, { distinctiveMarks: containsFilter(q) }, { clothing: containsFilter(q) }, { conditionSummary: containsFilter(q) }] } : {}),
@@ -444,7 +462,7 @@ export const publicController = {
         orderBy: { createdAt: "desc" },
         take,
       }),
-      prisma.hospitalAdmission.findMany({
+      documentQuery ? Promise.resolve([]) : prisma.hospitalAdmission.findMany({
         where: {
           deletedAt: null,
           verified: true,
@@ -469,7 +487,7 @@ export const publicController = {
           ...(status ? { status } : {}),
         },
         orderBy: { capturedAt: "desc" },
-        take,
+        take: documentQuery ? 1000 : take,
       }),
     ]);
 
@@ -533,7 +551,7 @@ export const publicController = {
         privacyLevel: "standard",
         createdAt: record.createdAt,
       })),
-      ...imported.map((record) => familyResult({
+      ...imported.filter((record) => recordDocumentMatches(record, documentQuery)).map((record) => familyResult({
         id: record.id,
         type: record.recordType,
         name: record.publicSafe?.fullName || record.publicSafe?.name || record.fullName,

@@ -31,7 +31,17 @@ function pick(raw, keys) {
   return undefined;
 }
 
+function privateObject(raw, keys) {
+  const entries = {};
+  for (const key of keys) {
+    const value = pick(raw, [key]);
+    if (value !== undefined) entries[key] = value;
+  }
+  return Object.keys(entries).length ? entries : undefined;
+}
+
 function detectType(raw) {
+  if (allowedTypes.has(raw?.recordType)) return raw.recordType;
   const text = JSON.stringify(raw || {}).toLowerCase();
   if (text.includes("fallecid") || text.includes("deceased")) return "deceased_person_private_only";
   if (text.includes("desaparecid") || text.includes("missing")) return "missing_person";
@@ -63,7 +73,7 @@ export class HumanitarianNormalizer {
       sourceName: source.name,
       sourceUrl: source.url,
       capturedAt,
-      sourceRecordId: String(pick(raw, ["id", "sourceRecordId", "uuid", "code"]) || randomUUID()),
+      sourceRecordId: String(pick(raw, ["id", "sourceRecordId", "uuid", "code", "registroId", "recordUrl", "url"]) || randomUUID()),
       recordType: allowedTypes.has(recordType) ? recordType : "damage_report",
       fullName: pick(raw, ["fullName", "name", "nombre", "persona"]),
       approximateAge: String(pick(raw, ["approximateAge", "age", "edad"]) || "").trim() || undefined,
@@ -72,12 +82,15 @@ export class HumanitarianNormalizer {
       hospitalName: pick(raw, ["hospitalName", "hospital"]),
       state: pick(raw, ["state", "estado"]),
       municipality: pick(raw, ["municipality", "municipio"]),
-      zone: pick(raw, ["zone", "sector", "zona", "parroquia"]),
+      zone: pick(raw, ["zone", "sector", "zona", "parroquia", "edificio"]),
       lastSeenPlace: pick(raw, ["lastSeenPlace", "ultimoLugar", "last_seen"]),
       currentPlace: pick(raw, ["currentPlace", "ubicacion", "current_place"]),
       description: stripSensitiveText(pick(raw, ["description", "descripcion", "details", "observaciones"])),
       photoUrl: pick(raw, ["photoUrl", "photo", "foto", "image"]),
-      contactInfoPrivate: pick(raw, ["contactInfoPrivate", "contact", "telefono", "phone"]),
+      contactInfoPrivate: pick(raw, ["contactInfoPrivate", "contact", "contacto", "telefono", "telefonos", "teléfonos", "phone"]),
+      documentPrivate: privateObject(raw, ["documentPrivate", "cedula", "cédula", "documento", "documentNumber", "documentId"]),
+      medicalPrivate: privateObject(raw, ["medicalPrivate", "informacionMedica", "información médica", "medicalInfo", "alergias", "allergies"]),
+      locationPrivate: privateObject(raw, ["locationPrivate", "edificio", "piso", "apartamento", "direccion", "dirección", "address"]),
       verificationStatus: "NO_VERIFICADO",
       privacyLevel: pick(raw, ["privacyLevel"]) || "standard",
       possibleDuplicate: false,

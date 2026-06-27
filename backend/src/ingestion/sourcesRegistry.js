@@ -1,5 +1,15 @@
 export const ingestionSources = [
   {
+    name: "Rescate Venezuela",
+    aliases: ["rescatevenezuela", "desaparecidovenezuela", "all-persons"],
+    url: "https://desaparecidovenezuela.com/",
+    type: "WEBSITE",
+    trustLevel: "medium",
+    connector: "rescate_venezuela",
+    enabled: true,
+    priority: ["missing_person", "safe_person", "hospitalized_person", "rescued_person", "trapped_person"],
+  },
+  {
     name: "Venezuela Te Busca",
     aliases: ["venezuelatebusca", "all-persons"],
     url: "https://venezuelatebusca.com",

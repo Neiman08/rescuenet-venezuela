@@ -20,6 +20,10 @@ function sameish(a, b) {
   return normalize(a) && normalize(a) === normalize(b);
 }
 
+function privateToken(value) {
+  return normalize(typeof value === "object" ? JSON.stringify(value) : value);
+}
+
 export class HumanitarianDeduplicationService {
   static centerTypes = new Set(["collection_center", "shelter", "hospital", "help_center", "water_point", "food_point", "medical_point", "volunteer_center", "donation_need"]);
 
@@ -35,6 +39,11 @@ export class HumanitarianDeduplicationService {
     if (sameish(candidate.status, existing.status)) score += 5;
     score += tokenScore(candidate.description, existing.description) * 10;
     if (candidate.photoUrl && sameish(candidate.photoUrl, existing.photoUrl)) score += 5;
+    if (privateToken(candidate.documentPrivate) && privateToken(candidate.documentPrivate) === privateToken(existing.documentPrivate)) score += 35;
+    if (privateToken(candidate.locationPrivate?.edificio) && sameish(candidate.locationPrivate?.edificio, existing.locationPrivate?.edificio)) score += 8;
+    if (privateToken(candidate.locationPrivate?.piso) && sameish(candidate.locationPrivate?.piso, existing.locationPrivate?.piso)) score += 6;
+    if (privateToken(candidate.locationPrivate?.apartamento) && sameish(candidate.locationPrivate?.apartamento, existing.locationPrivate?.apartamento)) score += 6;
+    if (sameish(candidate.sourceName, existing.sourceName) && sameish(candidate.sourceRecordId, existing.sourceRecordId)) score += 40;
     return Math.min(100, Math.round(score));
   }
 

@@ -646,6 +646,9 @@ model ImportedHumanitarianRecord {
   description       String?
   photoUrl          String?
   contactInfoPrivate String?
+  documentPrivate  Json?
+  medicalPrivate   Json?
+  locationPrivate  Json?
   verificationStatus ImportedRecordStatus @default(NO_VERIFICADO)
   privacyLevel      String                @default("standard")
   possibleDuplicate Boolean               @default(false)

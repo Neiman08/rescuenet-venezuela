@@ -40,7 +40,9 @@ export function sanitizePublicPlaceText(place, zone) {
     .replace(/[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?)[,\s]+[-+]?(1[0-7]\d(\.\d+)?|[1-9]?\d(\.\d+)?|180(\.0+)?)/g, "")
     .replace(/\+?\d[\d\s().-]{6,}\d/g, "")
     .replace(/\b(V|E|J|G)?-?\d{6,10}\b/gi, "")
+    .replace(/\s*[·•]\s*(piso|apartamento|apto|casa|#|nro|numero|\d).*/i, "")
     .replace(/\b(calle|av\.?|avenida|carrera|vereda|edificio|torre|piso|apartamento|apto|casa|numero|nro|#)\b.*$/i, "")
+    .replace(/\s*[·•]\s*$/g, "")
     .replace(/\s+/g, " ")
     .trim();
 

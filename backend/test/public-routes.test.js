@@ -412,3 +412,51 @@ test("public family search consolidates safe public data without raw payload", a
     prisma.importedHumanitarianRecord.findMany = originals.imported;
   }
 });
+
+test("public family search can match cedula privately without exposing sensitive fields", async () => {
+  const originals = {
+    missing: prisma.missingPersonReport.findMany,
+    safe: prisma.safeReport.findMany,
+    rescued: prisma.rescuedPerson.findMany,
+    admissions: prisma.hospitalAdmission.findMany,
+    imported: prisma.importedHumanitarianRecord.findMany,
+  };
+  prisma.missingPersonReport.findMany = async () => { throw new Error("document search should not scan public missing reports"); };
+  prisma.safeReport.findMany = async () => { throw new Error("document search should not scan safe reports"); };
+  prisma.rescuedPerson.findMany = async () => { throw new Error("document search should not scan rescued reports"); };
+  prisma.hospitalAdmission.findMany = async () => { throw new Error("document search should not scan admissions"); };
+  prisma.importedHumanitarianRecord.findMany = async () => [{
+    id: "imported-doc-1",
+    recordType: "missing_person",
+    fullName: "Nombre interno",
+    documentPrivate: { cedula: "V-12345678" },
+    contactInfoPrivate: "0412-1234567",
+    rawPayload: { cedula: "V-12345678", telefono: "0412-1234567" },
+    privacyLevel: "standard",
+    verificationStatus: "APROBADO",
+    publicSafe: {
+      fullName: "Persona Publica",
+      approximateAge: "30",
+      status: "desaparecida",
+      zone: "Los Teques",
+    },
+    updatedAt: new Date(),
+  }];
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/family-search/public?cedula=12345678" });
+    assert.equal(response.statusCode, 200);
+    const body = response._getJSONData();
+    assert.equal(body.data.length, 1);
+    assert.equal(body.data[0].name, "Persona Publica");
+    assert.equal(JSON.stringify(body).includes("12345678"), false);
+    assert.equal(JSON.stringify(body).includes("0412"), false);
+    assert.equal(JSON.stringify(body).includes("rawPayload"), false);
+  } finally {
+    prisma.missingPersonReport.findMany = originals.missing;
+    prisma.safeReport.findMany = originals.safe;
+    prisma.rescuedPerson.findMany = originals.rescued;
+    prisma.hospitalAdmission.findMany = originals.admissions;
+    prisma.importedHumanitarianRecord.findMany = originals.imported;
+  }
+});

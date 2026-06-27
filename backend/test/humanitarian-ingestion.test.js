@@ -12,6 +12,7 @@ import { HumanitarianNormalizer } from "../src/ingestion/humanitarianNormalizer.
 import { HumanitarianDeduplicationService } from "../src/ingestion/humanitarianDeduplicationService.js";
 import { IngestionPrivacyService } from "../src/ingestion/ingestionPrivacyService.js";
 import { isImportableHumanitarianRecord, isUsefulRawRecord } from "../src/ingestion/ingestionRecordQuality.js";
+import { fetchRescateVenezuela } from "../src/ingestion/rescateVenezuelaConnector.js";
 import { parseCliArgs } from "../src/ingestion/runHumanitarianIngestion.js";
 import { prisma } from "../src/config/prisma.js";
 
@@ -24,7 +25,46 @@ test("HumanitarianNormalizer keeps imported records unverified and stores raw pa
   assert.equal(record.verificationStatus, "NO_VERIFICADO");
   assert.equal(record.sourceName, source.name);
   assert.deepEqual(record.rawPayload, raw);
-  assert.equal(record.publicSafe.contact, "****4567");
+  assert.equal(record.publicSafe.contact, undefined);
+});
+
+test("HumanitarianNormalizer stores document, medical and exact location data privately", () => {
+  const record = HumanitarianNormalizer.normalize({
+    nombre: "Ana Perez",
+    cedula: "V-12345678",
+    telefono: "0412-1234567",
+    informacionMedica: "Requiere insulina",
+    alergias: "Penicilina",
+    edificio: "Torre Norte",
+    piso: "8",
+    apartamento: "8B",
+    estado: "Desaparecido",
+  }, source);
+
+  assert.equal(record.recordType, "missing_person");
+  assert.equal(record.documentPrivate.cedula, "V-12345678");
+  assert.equal(record.medicalPrivate.informacionMedica, "Requiere insulina");
+  assert.equal(record.locationPrivate.apartamento, "8B");
+  assert.equal(JSON.stringify(record.publicSafe).includes("12345678"), false);
+  assert.equal(JSON.stringify(record.publicSafe).includes("0412"), false);
+  assert.equal(JSON.stringify(record.publicSafe).includes("8B"), false);
+});
+
+test("Rescate Venezuela connector parses public embedded JSON without exposing bypass behavior", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    status: 200,
+    text: async () => "<script type=\"application/json\">{\"records\":[{\"nombre\":\"Persona Publica\",\"cedula\":\"V-12345678\",\"estado\":\"Desaparecido\",\"edificio\":\"Torre A\"}]}</script>",
+  });
+
+  try {
+    const result = await fetchRescateVenezuela({ name: "Rescate Venezuela", url: "https://desaparecidovenezuela.com/" });
+    assert.equal(result.records.length, 1);
+    assert.equal(result.records[0].recordType, "missing_person");
+    assert.equal(result.records[0].cedula, "V-12345678");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("HumanitarianNormalizer marks deceased records as private-only", () => {
@@ -194,12 +234,20 @@ test("CLI parser supports all-persons real source group", () => {
   const options = parseCliArgs(["--source=all-persons"]);
   const names = options.sources.map((item) => item.name);
 
+  assert.equal(names.includes("Rescate Venezuela"), true);
   assert.equal(names.includes("Venezuela Te Busca"), true);
   assert.equal(names.includes("Desaparecidos Terremoto Venezuela"), true);
   assert.equal(names.includes("Encuentralos"), true);
   assert.equal(names.includes("TerremotoVenezuela.app"), true);
   assert.equal(names.includes("Red Ayuda Venezuela"), true);
   assert.equal(names.includes("VzlAyuda"), true);
+});
+
+test("CLI parser supports Rescate Venezuela source filter", () => {
+  const options = parseCliArgs(["--source=rescatevenezuela"]);
+
+  assert.equal(options.sources.length, 1);
+  assert.equal(options.sources[0].name, "Rescate Venezuela");
 });
 
 test("HumanitarianImporter dry-run reads local files and writes report without DB writes", async () => {
