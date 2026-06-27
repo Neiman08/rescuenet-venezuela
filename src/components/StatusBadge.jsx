@@ -1,0 +1,24 @@
+export default function StatusBadge({ status }) {
+  const map = {
+    "En resguardo": "bg-green-100 text-green-700",
+    "En hospital": "bg-orange-100 text-orange-700",
+    "Identificada": "bg-green-100 text-green-700",
+    "Identificacion en proceso": "bg-yellow-100 text-yellow-700",
+    "Familiar localizado": "bg-blue-100 text-blue-700",
+    Reunificado: "bg-green-100 text-green-700",
+    "Fallecido confirmado": "bg-slate-200 text-slate-700",
+    "En proceso": "bg-yellow-100 text-yellow-700",
+    Verificada: "bg-green-100 text-green-700",
+    Pendiente: "bg-yellow-100 text-yellow-700",
+    Entregada: "bg-green-100 text-green-700",
+    Auditada: "bg-blue-100 text-blue-700",
+    Saturado: "bg-red-100 text-red-700",
+    Activo: "bg-green-100 text-green-700",
+    Operativo: "bg-blue-100 text-blue-700",
+    Validado: "bg-green-100 text-green-700",
+    "En revision": "bg-yellow-100 text-yellow-700",
+    Nuevo: "bg-red-100 text-red-700",
+    Confirmado: "bg-green-100 text-green-700",
+  };
+  return <span className={`badge ${map[status] || "bg-slate-100 text-slate-700"}`}>{status}</span>;
+}

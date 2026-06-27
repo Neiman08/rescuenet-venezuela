@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f3f6fa;
+  color: #0f172a;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  border-radius: 18px;
+}
+
+.card {
+  @apply bg-white rounded-2xl shadow-card border border-slate-100;
+}
+
+.badge {
+  @apply px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap;
+}
+
+.input {
+  @apply w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white;
+}
+
+.btn {
+  @apply rounded-xl px-4 py-3 font-semibold transition active:scale-[0.98];
+}
+
+.table-wrap {
+  @apply overflow-x-auto rounded-2xl border border-slate-100;
+}
