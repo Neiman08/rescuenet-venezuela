@@ -5,6 +5,12 @@ import { MapService } from "../services/MapService.js";
 import { PublicDataSanitizer } from "../services/PublicDataSanitizer.js";
 import { AuditService } from "../services/AuditService.js";
 import { AppError, asyncHandler } from "../utils/AppError.js";
+import {
+  affectedOperationalZones,
+  classifyOperationalResource,
+  findAffectedOperationalZone,
+  isInAffectedOperationalZone,
+} from "../data/affectedOperationalZones.js";
 
 const publicMeta = (req) => ({
   reporterType: "public",
@@ -29,6 +35,31 @@ async function ensureActiveAffectedZone(id) {
   return zone;
 }
 
+function publicOperationalZone(zone) {
+  return {
+    ...zone,
+    id: `${zone.state}-${zone.municipality}-${zone.sector}`.replace(/\s+/g, "-").toLowerCase(),
+    code: `${zone.priority}-${zone.state}-${zone.sector}`.replace(/\s+/g, "-").toUpperCase(),
+    level: zone.priority,
+    color: zone.priority === "CRITICA" ? "#dc2626" : zone.priority === "ALTA" ? "#f97316" : "#eab308",
+    operationalStatus: "RESPUESTA_OPERATIVA",
+    verification: "CATALOGO_OPERATIVO",
+  };
+}
+
+function withOperationalClassification(resource, recordType) {
+  const affectedZone = findAffectedOperationalZone(resource);
+  if (!affectedZone) return null;
+  return {
+    ...resource,
+    recordType,
+    operationalType: classifyOperationalResource(recordType),
+    earthquakeRelated: true,
+    affectedOperationalZone: publicOperationalZone(affectedZone),
+    operationalPriority: affectedZone.priority,
+  };
+}
+
 async function approvedImportedRecords(recordTypes, take = 500) {
   try {
     const records = await prisma.importedHumanitarianRecord.findMany({
@@ -36,7 +67,19 @@ async function approvedImportedRecords(recordTypes, take = 500) {
       orderBy: { capturedAt: "desc" },
       take,
     });
-    return records.map((record) => ({ id: record.id, ...record.publicSafe }));
+    return records
+      .map((record) => withOperationalClassification({
+        id: record.id,
+        ...record.publicSafe,
+        state: record.state || record.publicSafe?.state,
+        municipality: record.municipality || record.publicSafe?.municipality,
+        publicLocation: record.publicLocation || record.publicSafe?.publicLocation,
+        zone: record.zone || record.publicSafe?.zone,
+        latitudePrivate: record.latitudePrivate,
+        longitudePrivate: record.longitudePrivate,
+        verificationStatus: record.verificationStatus,
+      }, record.recordType))
+      .filter(Boolean);
   } catch {
     return [];
   }
@@ -241,20 +284,50 @@ export const publicController = {
   listPublicHospitals: asyncHandler(async (_req, res) => {
     const records = await prisma.hospital.findMany({ where: { deletedAt: null }, include: { affectedZone: true }, take: 100 });
     const imported = await approvedImportedRecords(["hospital", "hospitalized_person"]);
-    res.json({ data: [...records.map(PublicDataSanitizer.hospital), ...imported] });
+    const hospitals = records
+      .filter(isInAffectedOperationalZone)
+      .map(PublicDataSanitizer.hospital)
+      .map((record) => withOperationalClassification(record, "hospital"))
+      .filter(Boolean);
+    res.json({ data: [...hospitals, ...imported] });
   }),
 
   listPublicShelters: asyncHandler(async (_req, res) => {
     const records = await prisma.shelter.findMany({ where: { deletedAt: null }, include: { affectedZone: true }, take: 100 });
     const imported = await approvedImportedRecords(["shelter"]);
-    res.json({ data: [...records.map(PublicDataSanitizer.shelter), ...imported] });
+    const shelters = records
+      .filter(isInAffectedOperationalZone)
+      .map(PublicDataSanitizer.shelter)
+      .map((record) => withOperationalClassification(record, "shelter"))
+      .filter(Boolean);
+    res.json({ data: [...shelters, ...imported] });
   }),
 
   publicDashboard: asyncHandler(async (_req, res) => {
     const overview = await DashboardService.overview();
     const helpCenters = await approvedImportedRecords(publicCenterTypes);
+    const [hospitals, shelters, missing, safe, rescued, admissions, importedPeople] = await Promise.all([
+      prisma.hospital.findMany({ where: { deletedAt: null }, include: { affectedZone: true } }),
+      prisma.shelter.findMany({ where: { deletedAt: null }, include: { affectedZone: true } }),
+      prisma.missingPersonReport.count({ where: { deletedAt: null } }),
+      prisma.safeReport.count({ where: { deletedAt: null } }),
+      prisma.rescuedPerson.count({ where: { deletedAt: null } }),
+      prisma.hospitalAdmission.count({ where: { deletedAt: null, verified: true } }),
+      prisma.importedHumanitarianRecord.count({ where: { deletedAt: null, verificationStatus: "APROBADO", recordType: { in: familySearchTypes } } }),
+    ]);
+    const affectedHospitals = hospitals.filter(isInAffectedOperationalZone).length + helpCenters.filter((item) => item.operationalType === "hospital_near_disaster").length;
+    const affectedShelters = shelters.filter(isInAffectedOperationalZone).length + helpCenters.filter((item) => item.operationalType === "shelter").length;
+    const collectionCenters = helpCenters.filter((item) => item.operationalType === "collection_center").length;
     res.json({
-      stats: { ...overview.stats, activeCenters: overview.stats.activeCenters + helpCenters.length },
+      stats: {
+        ...overview.stats,
+        criticalZones: affectedOperationalZones.filter((zone) => zone.priority === "CRITICA").length,
+        nearbyHospitals: affectedHospitals,
+        activeShelters: affectedShelters,
+        collectionCenters,
+        registeredPeople: missing + safe + rescued + admissions + importedPeople,
+        activeCenters: affectedHospitals + affectedShelters + collectionCenters + helpCenters.filter((item) => !["hospital_near_disaster", "shelter", "collection_center"].includes(item.operationalType)).length,
+      },
       latestEmergencies: overview.latestEmergencies.map(PublicDataSanitizer.emergency),
       helpCenters: helpCenters.slice(0, 12),
     });
@@ -262,11 +335,21 @@ export const publicController = {
 
   publicMap: asyncHandler(async (_req, res) => {
     const map = await MapService.liveMap();
+    const hospitals = map.hospitals
+      .filter(isInAffectedOperationalZone)
+      .map(PublicDataSanitizer.hospital)
+      .map((record) => withOperationalClassification(record, "hospital"))
+      .filter(Boolean);
+    const shelters = map.shelters
+      .filter(isInAffectedOperationalZone)
+      .map(PublicDataSanitizer.shelter)
+      .map((record) => withOperationalClassification(record, "shelter"))
+      .filter(Boolean);
     res.json({
-      zones: map.zones.map(PublicDataSanitizer.affectedZone),
+      zones: affectedOperationalZones.map(publicOperationalZone),
       reports: map.reports.map(PublicDataSanitizer.emergency),
-      shelters: map.shelters.map(PublicDataSanitizer.shelter),
-      hospitals: map.hospitals.map(PublicDataSanitizer.hospital),
+      shelters,
+      hospitals,
       helpCenters: await approvedImportedRecords(publicCenterTypes),
     });
   }),
@@ -299,9 +382,19 @@ export const publicController = {
       prisma.hospital.findMany({ where: { deletedAt: null }, include: { affectedZone: true }, take: 100 }),
       prisma.shelter.findMany({ where: { deletedAt: null }, include: { affectedZone: true }, take: 100 }),
     ]);
+    const publicHospitals = hospitals
+      .filter(isInAffectedOperationalZone)
+      .map(PublicDataSanitizer.hospital)
+      .map((record) => withOperationalClassification(record, "hospital"))
+      .filter(Boolean);
+    const publicShelters = shelters
+      .filter(isInAffectedOperationalZone)
+      .map(PublicDataSanitizer.shelter)
+      .map((record) => withOperationalClassification(record, "shelter"))
+      .filter(Boolean);
     res.json({
-      hospitals: hospitals.map(PublicDataSanitizer.hospital),
-      shelters: shelters.map(PublicDataSanitizer.shelter),
+      hospitals: publicHospitals,
+      shelters: publicShelters,
       imported: await approvedImportedRecords(publicCenterTypes),
     });
   }),

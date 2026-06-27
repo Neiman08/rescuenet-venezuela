@@ -283,7 +283,9 @@ export default function InstitutionalIngestionReview() {
               </details>
               <div className="flex flex-wrap gap-2">
                 <button className="btn bg-rescueGreen text-white flex items-center gap-2" onClick={() => act(institutionalApi.approveIngestionRecord, record.id)}><CheckCircle size={17} /> Aprobar</button>
-                <button className="btn bg-red-600 text-white flex items-center gap-2" onClick={() => act(institutionalApi.rejectIngestionRecord, record.id)}><XCircle size={17} /> Rechazar</button>
+                <button className="btn bg-blue-700 text-white flex items-center gap-2" onClick={() => act((itemId) => institutionalApi.setIngestionRecordStatus(itemId, "APROBADO"), record.id)}><CheckCircle size={17} /> Relacionado con emergencia</button>
+                <button className="btn bg-red-600 text-white flex items-center gap-2" onClick={() => act(institutionalApi.rejectIngestionRecord, record.id)}><XCircle size={17} /> Fuera de zona afectada</button>
+                <button className="btn bg-yellow-500 text-slate-950 flex items-center gap-2" onClick={() => act((itemId) => institutionalApi.setIngestionRecordStatus(itemId, "NO_VERIFICADO"), record.id)}><ShieldAlert size={17} /> Pendiente de verificación</button>
                 <button className="btn bg-slate-800 text-white flex items-center gap-2" onClick={() => act(institutionalApi.markDuplicate, record.id)}><CopyCheck size={17} /> Marcar duplicado</button>
               </div>
             </article>

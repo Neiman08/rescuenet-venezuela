@@ -48,6 +48,12 @@ export default function Centers() {
       && (!filters.type || row.type === filters.type || itemText.includes(filters.type.toLowerCase()))
       && (!filters.operationalStatus || (row.operationalStatus || row.status) === filters.operationalStatus);
   });
+  const groupedRows = [
+    ["Hospitales cercanos a la tragedia", filteredRows.filter((row) => row.operationalType === "hospital_near_disaster" || row.type === "hospital")],
+    ["Refugios", filteredRows.filter((row) => row.operationalType === "shelter" || row.type === "shelter")],
+    ["Centros de acopio", filteredRows.filter((row) => row.operationalType === "collection_center" || row.type === "collection_center")],
+    ["Otros puntos de ayuda", filteredRows.filter((row) => !["hospital_near_disaster", "hospital", "shelter", "collection_center"].includes(row.operationalType || row.type))],
+  ].filter(([, items]) => items.length);
 
   return (
     <div className="space-y-6">
@@ -77,23 +83,29 @@ export default function Centers() {
           {operationalStatuses.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
       </div>
-      <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-4">
-        {filteredRows.map((center) => (
-          <div className="card p-5" key={center.name}>
-            <h2 className="font-black">{center.name}</h2>
-            <p className="text-sm text-slate-500">{center.labelType || center.type} - {center.zone}</p>
-            {center.acceptedItems?.length ? <p className="text-xs mt-3 font-semibold text-slate-600">Recibe: {center.acceptedItems.join(", ")}</p> : null}
-            {center.capacity ? (
-              <>
-                <div className="mt-4 h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-rescueBlue" style={{ width: `${Math.round((center.occupied / center.capacity) * 100)}%` }} />
-                </div>
-                <p className="text-xs mt-2">{center.occupied} de {center.capacity}</p>
-              </>
-            ) : <p className="text-xs mt-3">{center.operatingHours || center.operationalStatus || "Por verificar"}</p>}
+      {groupedRows.map(([title, items]) => (
+        <section key={title} className="space-y-3">
+          <h2 className="font-black text-lg">{title}</h2>
+          <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-4">
+            {items.map((center) => (
+              <div className="card p-5" key={center.id || center.name}>
+                <h3 className="font-black">{center.name}</h3>
+                <p className="text-sm text-slate-500">{center.labelType || center.type} - {center.zone}</p>
+                <p className="text-xs mt-2 font-semibold text-slate-600">{center.affectedOperationalZone?.sector || center.affectedZone?.sector || center.zone} · {center.operationalPriority || center.affectedOperationalZone?.priority || "Zona afectada"}</p>
+                {center.acceptedItems?.length ? <p className="text-xs mt-3 font-semibold text-slate-600">Recibe: {center.acceptedItems.join(", ")}</p> : null}
+                {center.capacity ? (
+                  <>
+                    <div className="mt-4 h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-rescueBlue" style={{ width: `${Math.round((center.occupied / center.capacity) * 100)}%` }} />
+                    </div>
+                    <p className="text-xs mt-2">{center.occupied} de {center.capacity}</p>
+                  </>
+                ) : <p className="text-xs mt-3">{center.operatingHours || center.operationalStatus || "Por verificar"}</p>}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </section>
+      ))}
       <DataTable columns={[
         { key: "name", label: "Centro" },
         { key: "type", label: "Tipo" },

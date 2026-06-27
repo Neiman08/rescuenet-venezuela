@@ -136,10 +136,15 @@ test("public missing endpoint merges approved publicSafe records without rawPayl
   prisma.missingPersonReport.findMany = async () => [];
   prisma.importedHumanitarianRecord.findMany = async () => [{
     id: "imported-1",
+    state: "Miranda",
+    municipality: "Guaicaipuro",
+    zone: "Los Teques",
     publicSafe: {
       fullName: "Informacion protegida",
       recordType: "missing_person",
       privacyLevel: "restricted",
+      state: "Miranda",
+      municipality: "Guaicaipuro",
       zone: "Los Teques",
     },
     rawPayload: { telefono: "04121234567", documento: "V-12345678" },
@@ -192,6 +197,171 @@ test("public help centers endpoint exposes approved publicSafe centers only", as
     prisma.hospital.findMany = originalHospital;
     prisma.shelter.findMany = originalShelter;
     prisma.importedHumanitarianRecord.findMany = originalImported;
+  }
+});
+
+test("public hospitals endpoint hides hospitals outside affected operational zones", async () => {
+  const originalHospital = prisma.hospital.findMany;
+  const originalImported = prisma.importedHumanitarianRecord.findMany;
+  prisma.hospital.findMany = async () => [
+    {
+      id: "hospital-lag-1",
+      name: "Hospital Vargas",
+      capacity: 100,
+      occupied: 0,
+      status: "OPERATIVO",
+      affectedZone: { state: "La Guaira", municipality: "Vargas", sector: "Maiquetia", lat: 10.6, lng: -66.96 },
+      updatedAt: new Date(),
+    },
+    {
+      id: "hospital-out-1",
+      name: "Hospital Amazonas",
+      capacity: 100,
+      occupied: 0,
+      status: "OPERATIVO",
+      affectedZone: { state: "Amazonas", municipality: "Atures", sector: "Puerto Ayacucho", lat: 5.66, lng: -67.63 },
+      updatedAt: new Date(),
+    },
+  ];
+  prisma.importedHumanitarianRecord.findMany = async () => [];
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/hospitals/public" });
+    assert.equal(response.statusCode, 200);
+    const body = response._getJSONData();
+    assert.equal(body.data.length, 1);
+    assert.equal(body.data[0].name, "Hospital Vargas");
+    assert.equal(body.data[0].operationalType, "hospital_near_disaster");
+  } finally {
+    prisma.hospital.findMany = originalHospital;
+    prisma.importedHumanitarianRecord.findMany = originalImported;
+  }
+});
+
+test("public help centers endpoint includes collection centers in critical affected zones", async () => {
+  const originalHospital = prisma.hospital.findMany;
+  const originalShelter = prisma.shelter.findMany;
+  const originalImported = prisma.importedHumanitarianRecord.findMany;
+  prisma.hospital.findMany = async () => [];
+  prisma.shelter.findMany = async () => [];
+  prisma.importedHumanitarianRecord.findMany = async () => [{
+    id: "center-critical-1",
+    recordType: "collection_center",
+    state: "Miranda",
+    municipality: "Guaicaipuro",
+    publicSafe: {
+      recordType: "collection_center",
+      name: "Centro de Acopio Los Teques",
+      state: "Miranda",
+      municipality: "Guaicaipuro",
+      publicLocation: "Los Teques, Guaicaipuro, Miranda",
+      acceptedItems: ["agua"],
+    },
+  }];
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/help-centers/public" });
+    assert.equal(response.statusCode, 200);
+    const body = response._getJSONData();
+    assert.equal(body.imported.length, 1);
+    assert.equal(body.imported[0].operationalType, "collection_center");
+    assert.equal(body.imported[0].operationalPriority, "CRITICA");
+  } finally {
+    prisma.hospital.findMany = originalHospital;
+    prisma.shelter.findMany = originalShelter;
+    prisma.importedHumanitarianRecord.findMany = originalImported;
+  }
+});
+
+test("public map endpoint does not return resources outside affected operational zones", async () => {
+  const originals = {
+    zones: prisma.affectedZone.findMany,
+    reports: prisma.emergencyReport.findMany,
+    shelters: prisma.shelter.findMany,
+    hospitals: prisma.hospital.findMany,
+    imported: prisma.importedHumanitarianRecord.findMany,
+  };
+  prisma.affectedZone.findMany = async () => [];
+  prisma.emergencyReport.findMany = async () => [];
+  prisma.shelter.findMany = async () => [];
+  prisma.hospital.findMany = async () => [
+    { id: "h-in", name: "Hospital La Guaira", status: "OPERATIVO", affectedZone: { state: "La Guaira", municipality: "Vargas", sector: "Macuto", lat: 10.61, lng: -66.89 }, updatedAt: new Date() },
+    { id: "h-out", name: "Hospital Apure", status: "OPERATIVO", affectedZone: { state: "Apure", municipality: "San Fernando", sector: "San Fernando", lat: 7.89, lng: -67.47 }, updatedAt: new Date() },
+  ];
+  prisma.importedHumanitarianRecord.findMany = async () => [];
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/map/public" });
+    assert.equal(response.statusCode, 200);
+    const body = response._getJSONData();
+    assert.equal(body.hospitals.length, 1);
+    assert.equal(body.hospitals[0].name, "Hospital La Guaira");
+    assert.equal(body.hospitals.some((item) => item.name === "Hospital Apure"), false);
+  } finally {
+    prisma.affectedZone.findMany = originals.zones;
+    prisma.emergencyReport.findMany = originals.reports;
+    prisma.shelter.findMany = originals.shelters;
+    prisma.hospital.findMany = originals.hospitals;
+    prisma.importedHumanitarianRecord.findMany = originals.imported;
+  }
+});
+
+test("public dashboard counts only affected operational resources", async () => {
+  const originals = {
+    overview: prisma.emergencyReport.findMany,
+    activeEmergencyCount: prisma.emergencyReport.count,
+    hospitalCount: prisma.hospital.count,
+    shelterCount: prisma.shelter.count,
+    organizationCount: prisma.organization.count,
+    donationAggregate: prisma.donation.aggregate,
+    hospitalFindMany: prisma.hospital.findMany,
+    shelterFindMany: prisma.shelter.findMany,
+    missingCount: prisma.missingPersonReport.count,
+    safeCount: prisma.safeReport.count,
+    rescuedCount: prisma.rescuedPerson.count,
+    admissionsCount: prisma.hospitalAdmission.count,
+    importedCount: prisma.importedHumanitarianRecord.count,
+    importedFindMany: prisma.importedHumanitarianRecord.findMany,
+  };
+  prisma.emergencyReport.findMany = async () => [];
+  prisma.emergencyReport.count = async () => 0;
+  prisma.hospital.count = async () => 2;
+  prisma.shelter.count = async () => 0;
+  prisma.organization.count = async () => 0;
+  prisma.donation.aggregate = async () => ({ _sum: { amount: 0 } });
+  prisma.hospital.findMany = async () => [
+    { id: "h-in", name: "Hospital La Guaira", affectedZone: { state: "La Guaira", municipality: "Vargas", sector: "Macuto", lat: 10.61, lng: -66.89 } },
+    { id: "h-out", name: "Hospital Apure", affectedZone: { state: "Apure", municipality: "San Fernando", sector: "San Fernando", lat: 7.89, lng: -67.47 } },
+  ];
+  prisma.shelter.findMany = async () => [];
+  prisma.missingPersonReport.count = async () => 0;
+  prisma.safeReport.count = async () => 0;
+  prisma.rescuedPerson.count = async () => 0;
+  prisma.hospitalAdmission.count = async () => 0;
+  prisma.importedHumanitarianRecord.count = async () => 0;
+  prisma.importedHumanitarianRecord.findMany = async () => [];
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/dashboard/public" });
+    assert.equal(response.statusCode, 200);
+    const body = response._getJSONData();
+    assert.equal(body.stats.nearbyHospitals, 1);
+    assert.equal(body.stats.activeCenters, 1);
+  } finally {
+    prisma.emergencyReport.findMany = originals.overview;
+    prisma.emergencyReport.count = originals.activeEmergencyCount;
+    prisma.hospital.count = originals.hospitalCount;
+    prisma.shelter.count = originals.shelterCount;
+    prisma.organization.count = originals.organizationCount;
+    prisma.donation.aggregate = originals.donationAggregate;
+    prisma.hospital.findMany = originals.hospitalFindMany;
+    prisma.shelter.findMany = originals.shelterFindMany;
+    prisma.missingPersonReport.count = originals.missingCount;
+    prisma.safeReport.count = originals.safeCount;
+    prisma.rescuedPerson.count = originals.rescuedCount;
+    prisma.hospitalAdmission.count = originals.admissionsCount;
+    prisma.importedHumanitarianRecord.count = originals.importedCount;
+    prisma.importedHumanitarianRecord.findMany = originals.importedFindMany;
   }
 });
 

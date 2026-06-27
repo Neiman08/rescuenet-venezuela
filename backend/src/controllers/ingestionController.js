@@ -147,6 +147,25 @@ export const ingestionController = {
     res.json({ data: publicRecord(record) });
   }),
 
+  setVerificationStatus: asyncHandler(async (req, res) => {
+    const allowed = new Set(["NO_VERIFICADO", "APROBADO", "RECHAZADO", "DUPLICADO"]);
+    const verificationStatus = String(req.body?.verificationStatus || "");
+    if (!allowed.has(verificationStatus)) {
+      res.status(400).json({ error: { message: "Unsupported verification status." } });
+      return;
+    }
+    const record = await prisma.importedHumanitarianRecord.update({
+      where: { id: req.params.id },
+      data: {
+        verificationStatus,
+        reviewedById: req.user?.id,
+        approvedAt: verificationStatus === "APROBADO" ? new Date() : undefined,
+        rejectedAt: verificationStatus === "RECHAZADO" ? new Date() : undefined,
+      },
+    });
+    res.json({ data: publicRecord(record) });
+  }),
+
   markDuplicate: asyncHandler(async (req, res) => {
     const record = await prisma.importedHumanitarianRecord.update({
       where: { id: req.params.id },

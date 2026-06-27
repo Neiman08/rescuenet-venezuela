@@ -14,6 +14,7 @@ router.post("/records/approve-many", ingestionController.approveMany);
 router.post("/records/approve-filtered", ingestionController.approveFiltered);
 router.post("/records/:id/approve", ingestionController.approve);
 router.post("/records/:id/reject", ingestionController.reject);
+router.patch("/records/:id/status", ingestionController.setVerificationStatus);
 router.post("/records/:id/mark-duplicate", ingestionController.markDuplicate);
 router.post("/records/:id/link-duplicate", ingestionController.linkDuplicate);
 

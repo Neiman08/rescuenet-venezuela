@@ -63,6 +63,7 @@ export const institutionalApi = {
   approveIngestionRecords: (ids) => request("/ingestion/records/approve-many", { method: "POST", body: JSON.stringify({ ids }) }),
   approveFilteredIngestionRecords: (filters) => request("/ingestion/records/approve-filtered", { method: "POST", body: JSON.stringify({ filters }) }),
   rejectIngestionRecord: (id) => request(`/ingestion/records/${id}/reject`, { method: "POST" }),
+  setIngestionRecordStatus: (id, verificationStatus) => request(`/ingestion/records/${id}/status`, { method: "PATCH", body: JSON.stringify({ verificationStatus }) }),
   markDuplicate: (id) => request(`/ingestion/records/${id}/mark-duplicate`, { method: "POST" }),
 };
 
