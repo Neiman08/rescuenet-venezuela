@@ -3,24 +3,31 @@ import SectionTitle from "../components/SectionTitle";
 import MapPreview from "../components/MapPreview";
 import PublicAccessNotice from "../components/PublicAccessNotice";
 import StatusBadge from "../components/StatusBadge";
+import { demoDataEnabled, noRealDataMessage } from "../config/demoData";
 import { affectedZones } from "../data/affectedZones";
 import { mapReports } from "../data/mockData";
 import { gisLayers, logisticsCorridors } from "../data/gisLayers";
 import { publicApi } from "../lib/api";
 
 export default function LiveMap() {
-  const [zones, setZones] = useState(affectedZones);
-  const [reports, setReports] = useState(mapReports);
+  const [zones, setZones] = useState(demoDataEnabled ? affectedZones : []);
+  const [reports, setReports] = useState(demoDataEnabled ? mapReports : []);
   const [status, setStatus] = useState("loading");
 
   useEffect(() => {
     publicApi.getMap()
       .then((payload) => {
-        if (payload?.zones?.length) setZones(payload.zones);
-        if (payload?.reports?.length) setReports(payload.reports);
-        setStatus("success");
+        const nextZones = payload?.zones || [];
+        const nextReports = payload?.reports || [];
+        setZones(nextZones.length ? nextZones : demoDataEnabled ? affectedZones : []);
+        setReports(nextReports.length ? nextReports : demoDataEnabled ? mapReports : []);
+        setStatus(nextZones.length || nextReports.length ? "success" : demoDataEnabled ? "fallback" : "empty");
       })
-      .catch(() => setStatus("fallback"));
+      .catch(() => {
+        setZones(demoDataEnabled ? affectedZones : []);
+        setReports(demoDataEnabled ? mapReports : []);
+        setStatus(demoDataEnabled ? "fallback" : "error");
+      });
   }, []);
 
   return (
@@ -28,6 +35,7 @@ export default function LiveMap() {
       <SectionTitle title="Mapa en vivo" subtitle="Zonas afectadas, radios de impacto y reportes operativos simulados." />
       <PublicAccessNotice text="No necesitas crear cuenta para ver el mapa publico y ubicar ayuda cercana." />
       {status === "fallback" && <div className="rounded-2xl bg-yellow-50 p-4 text-sm font-semibold text-yellow-800">No pudimos conectar con el mapa publico del backend. Mostrando datos simulados locales.</div>}
+      {(status === "error" || status === "empty") && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>}
       <div className="grid xl:grid-cols-[320px_1fr] gap-6">
         <aside className="card p-5 space-y-4">
           <h2 className="font-black text-lg">Filtros</h2>

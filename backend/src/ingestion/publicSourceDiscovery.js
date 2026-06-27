@@ -1,3 +1,5 @@
+import { isUsefulRawRecord } from "./ingestionRecordQuality.js";
+
 const jsonScriptPattern = /<script[^>]+type=["']application\/json["'][^>]*>([\s\S]*?)<\/script>/gi;
 const nextDataPattern = /<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i;
 
@@ -18,7 +20,7 @@ function flattenObjects(value, output = []) {
   if (typeof value === "object") {
     const keys = Object.keys(value);
     const hasHumanitarianSignal = keys.some((key) => /name|nombre|estado|status|hospital|telefono|phone|zona|sector|descripcion|description/i.test(key));
-    if (hasHumanitarianSignal) output.push(value);
+    if (hasHumanitarianSignal && isUsefulRawRecord(value)) output.push(value);
     for (const entry of Object.values(value)) flattenObjects(entry, output);
   }
   return output;
@@ -31,11 +33,6 @@ export function discoverEmbeddedRecords(html) {
 
   for (const match of html.matchAll(jsonScriptPattern)) {
     records.push(...flattenObjects(safeJsonParse(match[1])));
-  }
-
-  if (!records.length) {
-    const text = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-    if (text) records.push({ description: text.slice(0, 2000), type: "damage_report" });
   }
 
   return records;

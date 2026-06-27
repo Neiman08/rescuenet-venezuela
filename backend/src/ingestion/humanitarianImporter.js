@@ -9,6 +9,7 @@ import { enabledSources } from "./sourcesRegistry.js";
 import { HumanitarianNormalizer } from "./humanitarianNormalizer.js";
 import { HumanitarianDeduplicationService } from "./humanitarianDeduplicationService.js";
 import { IngestionAuditService } from "./ingestionAuditService.js";
+import { isImportableHumanitarianRecord } from "./ingestionRecordQuality.js";
 import { fetchReliefWeb } from "./reliefWebConnector.js";
 import { scrapeRedAyudaVenezuela } from "./redAyudaVenezuelaScraper.js";
 import { scrapeVzlAyuda } from "./vzlAyudaScraper.js";
@@ -202,7 +203,8 @@ export class HumanitarianImporter {
           ? { kind: "file", records: await recordsFromFile(source.file) }
           : await scraperFor(source)(source);
         sourceReport.extracted = scrape.records.length;
-        const normalized = HumanitarianNormalizer.normalizeMany(scrape.records, source);
+        const normalized = HumanitarianNormalizer.normalizeMany(scrape.records, source).filter(isImportableHumanitarianRecord);
+        sourceReport.filteredOut = sourceReport.extracted - normalized.length;
         const deduped = HumanitarianDeduplicationService.mark(normalized, existing);
         const scored = DataQualityScoringService.scoreMany(deduped, source, existing);
         sourceReport.normalized = scored.length;

@@ -1,19 +1,49 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Building2, CheckCircle, Droplet, MessageCircle, Pill, ShieldCheck, Siren, Utensils, Users } from "lucide-react";
 import ActionCard from "../components/ActionCard";
 import StatCard from "../components/StatCard";
 import MapPreview from "../components/MapPreview";
 import StatusBadge from "../components/StatusBadge";
+import { demoDataEnabled, noRealDataMessage } from "../config/demoData";
 import { centers, simulationNotice, stats } from "../data/mockData";
+import { publicApi } from "../lib/api";
 
 export default function Dashboard() {
+  const [dashboardStats, setDashboardStats] = useState(demoDataEnabled ? stats : {});
+  const [mapData, setMapData] = useState({ zones: [], reports: [] });
+  const [helpCenters, setHelpCenters] = useState(demoDataEnabled ? centers : []);
+  const [status, setStatus] = useState("loading");
+
+  useEffect(() => {
+    Promise.allSettled([publicApi.getDashboard(), publicApi.getMap(), publicApi.getHelpCenters()])
+      .then(([dashboard, map, help]) => {
+        if (dashboard.status === "fulfilled") setDashboardStats(dashboard.value.stats || {});
+        if (map.status === "fulfilled") setMapData({ zones: map.value.zones || [], reports: map.value.reports || [] });
+        if (help.status === "fulfilled") {
+          const nextCenters = [
+            ...(help.value.hospitals || []).map((item) => ({ ...item, type: "Hospital", zone: item.affectedZone?.sector || "Zona no indicada" })),
+            ...(help.value.shelters || []).map((item) => ({ ...item, type: "Refugio", zone: item.affectedZone?.sector || "Zona no indicada" })),
+            ...(help.value.imported || []).map((item) => ({ ...item, type: item.recordType, zone: item.publicLocation || item.zone || "Zona no indicada", capacity: item.capacity || 0, occupied: item.occupied || 0 })),
+          ];
+          setHelpCenters(nextCenters.length ? nextCenters : demoDataEnabled ? centers : []);
+        }
+        const hasRealData = dashboard.status === "fulfilled" || map.status === "fulfilled" || help.status === "fulfilled";
+        setStatus(hasRealData ? "success" : demoDataEnabled ? "fallback" : "error");
+      })
+      .catch(() => setStatus(demoDataEnabled ? "fallback" : "error"));
+  }, []);
+
   return (
     <div className="space-y-6">
+      {(status === "error" || (!demoDataEnabled && status === "success" && !Object.keys(dashboardStats).length && !mapData.zones.length && !helpCenters.length)) && (
+        <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>
+      )}
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 rounded-3xl overflow-hidden bg-navy text-white shadow-card relative min-h-[460px]">
           <div className="absolute inset-0 opacity-25 bg-[url('https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?w=1200&auto=format&fit=crop')] bg-cover bg-center" />
           <div className="relative p-6 md:p-8">
-            <StatusBadge status="Simulada" />
+            <StatusBadge status={demoDataEnabled && status === "fallback" ? "Demo" : "Datos reales"} />
             <h1 className="text-3xl md:text-4xl font-black max-w-xl mt-4">Juntos salvamos vidas</h1>
             <p className="text-blue-100 mt-3 max-w-xl">
               Plataforma unificada de emergencia, rescate y ayuda humanitaria para las zonas afectadas por el terremoto.
@@ -40,7 +70,7 @@ export default function Dashboard() {
               Futuro bot para emergencias, ubicacion, fotos, audio, busqueda familiar, estado seguro y refugios cercanos.
             </p>
           </div>
-          <p className="text-xs text-slate-500 mt-4">{simulationNotice}</p>
+          {demoDataEnabled && <p className="text-xs text-slate-500 mt-4">{simulationNotice}</p>}
           <div className="mt-5 space-y-3">
             <Link to="/mapa" className="btn bg-blue-600 text-white block text-center">Ver mapa en vivo</Link>
             <Link to="/operaciones" className="btn bg-navy text-white block text-center">Centro de operaciones</Link>
@@ -51,10 +81,10 @@ export default function Dashboard() {
       </section>
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Emergencias activas" value={stats.activeEmergencies.toLocaleString()} color="red" icon={<Siren />} change="+120 ultimas horas" />
-        <StatCard title="Personas rescatadas" value={stats.rescuedPeople.toLocaleString()} color="green" icon={<ShieldCheck />} change="+86 ultimas horas" />
-        <StatCard title="Personas a salvo" value={stats.safePeople.toLocaleString()} color="blue" icon={<CheckCircle />} change="+210 ultimas horas" />
-        <StatCard title="Centros operativos" value={stats.activeCenters} color="purple" icon={<Building2 />} change="Actualizado hace 2 min" />
+        <StatCard title="Emergencias activas" value={(dashboardStats.activeEmergencies || 0).toLocaleString()} color="red" icon={<Siren />} />
+        <StatCard title="Personas rescatadas" value={(dashboardStats.rescuedPeople || 0).toLocaleString()} color="green" icon={<ShieldCheck />} />
+        <StatCard title="Personas a salvo" value={(dashboardStats.safePeople || 0).toLocaleString()} color="blue" icon={<CheckCircle />} />
+        <StatCard title="Centros operativos" value={dashboardStats.activeCenters || helpCenters.length || 0} color="purple" icon={<Building2 />} />
       </section>
 
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -63,7 +93,7 @@ export default function Dashboard() {
             <h2 className="font-black text-lg">Mapa de situacion</h2>
             <Link to="/mapa" className="text-blue-600 text-sm font-bold">Ver mapa completo</Link>
           </div>
-          <MapPreview />
+          <MapPreview zonesData={mapData.zones} reports={mapData.reports} />
         </div>
         <div className="card p-5">
           <h2 className="font-black text-lg mb-4">Necesidades urgentes</h2>
@@ -89,14 +119,18 @@ export default function Dashboard() {
       </section>
 
       <section className="grid md:grid-cols-2 xl:grid-cols-5 gap-4">
-        {centers.map((center) => (
+        {helpCenters.map((center) => (
           <div key={center.name} className="card p-5">
             <h3 className="font-black">{center.name}</h3>
             <p className="text-sm text-slate-500">{center.type} - {center.zone}</p>
-            <div className="mt-4 h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-600" style={{ width: `${(center.occupied / center.capacity) * 100}%` }} />
-            </div>
-            <p className="text-xs mt-2">{center.occupied}/{center.capacity} ocupados</p>
+            {center.capacity ? (
+              <>
+                <div className="mt-4 h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-600" style={{ width: `${(center.occupied / center.capacity) * 100}%` }} />
+                </div>
+                <p className="text-xs mt-2">{center.occupied}/{center.capacity} ocupados</p>
+              </>
+            ) : <p className="text-xs mt-2">{center.operationalStatus || "Por revisar"}</p>}
           </div>
         ))}
       </section>

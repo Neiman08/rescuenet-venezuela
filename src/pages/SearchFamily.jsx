@@ -4,12 +4,13 @@ import { Search, UserPlus } from "lucide-react";
 import PublicAccessNotice from "../components/PublicAccessNotice";
 import SectionTitle from "../components/SectionTitle";
 import DataTable from "../components/DataTable";
+import { demoDataEnabled, noRealDataMessage } from "../config/demoData";
 import { rescuedPeople } from "../data/mockData";
 import { publicApi } from "../lib/api";
 
 export default function SearchFamily() {
   const [query, setQuery] = useState("");
-  const [rows, setRows] = useState(rescuedPeople);
+  const [rows, setRows] = useState(demoDataEnabled ? rescuedPeople : []);
   const [status, setStatus] = useState("loading");
 
   useEffect(() => {
@@ -50,10 +51,14 @@ export default function SearchFamily() {
           setRows(nextRows);
           setStatus("success");
         } else {
-          setStatus("fallback");
+          setRows(demoDataEnabled ? rescuedPeople : []);
+          setStatus(demoDataEnabled ? "fallback" : "empty");
         }
       })
-      .catch(() => setStatus("fallback"));
+      .catch(() => {
+        setRows(demoDataEnabled ? rescuedPeople : []);
+        setStatus(demoDataEnabled ? "fallback" : "error");
+      });
   }, []);
 
   const filteredRows = rows.filter((row) => {
@@ -74,6 +79,7 @@ export default function SearchFamily() {
         <Link to="/coincidencias" className="btn bg-navy text-white flex items-center justify-center gap-2"><Search size={18} /> Ver coincidencias</Link>
       </div>
       {status === "fallback" && <div className="rounded-2xl bg-yellow-50 p-4 text-sm font-semibold text-yellow-800">No pudimos conectar con el backend. Mostrando datos simulados locales.</div>}
+      {(status === "error" || status === "empty") && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>}
       <DataTable
         columns={[
           { key: "id", label: "Codigo" },

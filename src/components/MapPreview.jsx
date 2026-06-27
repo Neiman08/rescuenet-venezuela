@@ -1,5 +1,6 @@
 import { MapContainer, TileLayer, Circle, CircleMarker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import { demoDataEnabled } from "../config/demoData";
 import { affectedZones } from "../data/affectedZones";
 import { mapReports } from "../data/mockData";
 
@@ -12,7 +13,7 @@ const colors = {
   orange: "#f97316",
 };
 
-export default function MapPreview({ zones = true, zonesData = affectedZones, reports = mapReports }) {
+export default function MapPreview({ zones = true, zonesData = demoDataEnabled ? affectedZones : [], reports = demoDataEnabled ? mapReports : [] }) {
   return (
     <MapContainer center={[10.35, -67.15]} zoom={8} scrollWheelZoom={false}>
       <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />

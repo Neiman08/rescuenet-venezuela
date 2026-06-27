@@ -11,6 +11,7 @@ import { HumanitarianImporter } from "../src/ingestion/humanitarianImporter.js";
 import { HumanitarianNormalizer } from "../src/ingestion/humanitarianNormalizer.js";
 import { HumanitarianDeduplicationService } from "../src/ingestion/humanitarianDeduplicationService.js";
 import { IngestionPrivacyService } from "../src/ingestion/ingestionPrivacyService.js";
+import { isImportableHumanitarianRecord, isUsefulRawRecord } from "../src/ingestion/ingestionRecordQuality.js";
 import { parseCliArgs } from "../src/ingestion/runHumanitarianIngestion.js";
 import { prisma } from "../src/config/prisma.js";
 
@@ -125,6 +126,44 @@ test("DataQualityScoringService scores source trust and duplicate factors", () =
   assert.equal(scored.confidenceLevel, "medium");
   assert.equal(scored.confidenceFactors.includes("official_or_humanitarian_source"), true);
   assert.equal(scored.confidenceFactors.includes("possible_duplicate"), true);
+});
+
+test("ingestion quality rejects full-page CSS and consent text noise", () => {
+  assert.equal(isUsefulRawRecord({
+    name: "The technical storage or access that is used exclusively for statistical purposes.",
+    descripcion: "Without a subpoena, voluntary compliance cannot usually identify you.",
+  }), false);
+  assert.equal(isImportableHumanitarianRecord({
+    recordType: "volunteer_center",
+    name: "The technical storage or access that is used exclusively for statistical purposes.",
+    description: "@font-face{font-family:Encode Sans Condensed;unicode-range:U+0100}",
+  }), false);
+});
+
+test("ingestion quality accepts structured humanitarian records", () => {
+  assert.equal(isUsefulRawRecord({
+    nombre: "Centro de Acopio Los Teques",
+    estado: "Miranda",
+    municipio: "Guaicaipuro",
+    recibe: "agua, alimentos",
+  }), true);
+  assert.equal(isImportableHumanitarianRecord({
+    recordType: "missing_person",
+    fullName: "Ana Perez",
+    status: "desaparecida",
+    state: "Miranda",
+    zone: "Los Teques",
+  }), true);
+});
+
+test("ingestion quality rejects news headlines that are not operational aid points", () => {
+  assert.equal(isImportableHumanitarianRecord({
+    recordType: "food_point",
+    name: "Ciudadanos hacen colas para comprar alimentos en el centro y oeste de Caracas",
+    publicLocation: "“Desde la pandemia no veía esto”",
+    acceptedItems: [],
+    description: "Ciudadanos hacen colas para comprar alimentos en el centro y oeste de Caracas: “Desde la pandemia no veía esto”",
+  }), false);
 });
 
 test("Excel connector parses xlsx rows", async () => {

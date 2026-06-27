@@ -1,4 +1,5 @@
 import { discoverEmbeddedRecords, fetchPublicSource } from "./publicSourceDiscovery.js";
+import { isUsefulLine } from "./ingestionRecordQuality.js";
 
 const centerSignal = /(acopio|punto de ayuda|centro de ayuda|refugio|hospital|agua|alimento|comida|medicina|salud|voluntar)/i;
 
@@ -30,7 +31,7 @@ export function discoverCollectionCenterRecords(html, source) {
   const textLines = cleanText(html)
     .split(/\n/)
     .map((line) => line.trim())
-    .filter((line) => line.length >= 12 && centerSignal.test(line))
+    .filter((line) => centerSignal.test(line) && isUsefulLine(line))
     .slice(0, 250)
     .map((line) => inferRecordFromLine(line, source));
   return [...embedded, ...textLines];

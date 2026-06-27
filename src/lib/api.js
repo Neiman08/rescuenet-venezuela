@@ -39,6 +39,7 @@ export const publicApi = {
   getMissingReports: () => request("/missing/public"),
   getRescued: () => request("/rescued/public"),
   getMap: () => request("/map/public"),
+  getDashboard: () => request("/dashboard/public"),
   getAffectedZones: () => request("/affected-zones/public"),
   getHelpCenters: () => request("/help-centers/public"),
   getHospitals: () => request("/hospitals/public"),

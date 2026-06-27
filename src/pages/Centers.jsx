@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import DataTable from "../components/DataTable";
 import PublicAccessNotice from "../components/PublicAccessNotice";
 import SectionTitle from "../components/SectionTitle";
+import { demoDataEnabled, noRealDataMessage } from "../config/demoData";
 import { centers } from "../data/mockData";
 import { publicApi } from "../lib/api";
 
 export default function Centers() {
-  const [rows, setRows] = useState(centers);
+  const [rows, setRows] = useState(demoDataEnabled ? centers : []);
   const [status, setStatus] = useState("loading");
   const [filters, setFilters] = useState({ state: "", municipality: "", type: "", operationalStatus: "" });
 
@@ -18,10 +19,18 @@ export default function Centers() {
           ...(payload.shelters || []).map((item) => ({ ...item, type: "shelter", labelType: "Refugio", zone: item.affectedZone?.sector || "Zona no indicada", state: item.affectedZone?.state, municipality: item.affectedZone?.municipality, operationalStatus: item.status })),
           ...(payload.imported || []).map((item) => ({ ...item, type: item.recordType, labelType: labelForType(item.recordType), zone: item.publicLocation || item.zone || "Zona no indicada", capacity: item.capacity || 0, occupied: item.occupied || 0, operationalStatus: item.operationalStatus })),
         ];
-        if (nextRows.length) setRows(nextRows);
-        setStatus("success");
+        if (nextRows.length) {
+          setRows(nextRows);
+          setStatus("success");
+        } else {
+          setRows(demoDataEnabled ? centers : []);
+          setStatus(demoDataEnabled ? "fallback" : "empty");
+        }
       })
-      .catch(() => setStatus("fallback"));
+      .catch(() => {
+        setRows(demoDataEnabled ? centers : []);
+        setStatus(demoDataEnabled ? "fallback" : "error");
+      });
   }, []);
 
   function updateFilter(event) {
@@ -45,6 +54,7 @@ export default function Centers() {
       <SectionTitle title="Centros de ayuda" subtitle="Refugios, hospitales y centros de acopio vinculados a zonas afectadas." />
       <PublicAccessNotice text="No necesitas crear cuenta para consultar refugios, hospitales o centros de ayuda." />
       {status === "fallback" && <div className="rounded-2xl bg-yellow-50 p-4 text-sm font-semibold text-yellow-800">No pudimos conectar con centros publicos del backend. Mostrando datos simulados locales.</div>}
+      {(status === "error" || status === "empty") && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noRealDataMessage}</div>}
       <div className="card p-5 grid md:grid-cols-4 gap-3">
         <select className="input" name="state" value={filters.state} onChange={updateFilter}>
           <option value="">Todos los estados</option>
