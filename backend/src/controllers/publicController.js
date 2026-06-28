@@ -78,6 +78,66 @@ function stripInternalPublicFields(record) {
   return safeRecord;
 }
 
+const validPublicStates = new Set([
+  "amazonas",
+  "anzoategui",
+  "anzoátegui",
+  "apure",
+  "aragua",
+  "barinas",
+  "bolivar",
+  "bolívar",
+  "carabobo",
+  "cojedes",
+  "delta amacuro",
+  "distrito capital",
+  "falcon",
+  "falcón",
+  "guarico",
+  "guárico",
+  "la guaira",
+  "lara",
+  "merida",
+  "mérida",
+  "miranda",
+  "monagas",
+  "nueva esparta",
+  "portuguesa",
+  "sucre",
+  "tachira",
+  "táchira",
+  "trujillo",
+  "yaracuy",
+  "zulia",
+]);
+
+function looksLikeMedicalText(value) {
+  return /politraumat|trauma|fractur|quemadur|herid|lesion|lesión|diagnost|dolor|sangr|uci|grave|critico|crítico|estable|shock|contus|hematoma|paro|insuficiencia|neumon|diabet|hipertensi|embaraz|fallecid|muert|cadaver|cadáver/i.test(String(value || ""));
+}
+
+function publicPersonStatus(recordType, status) {
+  if (recordType === "hospitalized_person") return "Hospitalizado";
+  if (looksLikeMedicalText(status)) return "Informacion protegida";
+  return status;
+}
+
+function normalizeImportedPersonPublicFields(publicRecord, recordType) {
+  const safeRecord = { ...publicRecord };
+  if (familySearchTypes.includes(recordType)) {
+    safeRecord.status = publicPersonStatus(recordType, safeRecord.status);
+    if (safeRecord.patientStatus) safeRecord.patientStatus = publicPersonStatus(recordType, safeRecord.patientStatus);
+    if (safeRecord.state && (!validPublicStates.has(String(safeRecord.state).trim().toLowerCase()) || looksLikeMedicalText(safeRecord.state))) {
+      delete safeRecord.state;
+    }
+    delete safeRecord.condition;
+    delete safeRecord.diagnosis;
+    delete safeRecord.room;
+    delete safeRecord.bed;
+    delete safeRecord.floor;
+  }
+  return safeRecord;
+}
+
 async function approvedImportedRecords(recordTypes, take = 500) {
   try {
     const records = await prisma.importedHumanitarianRecord.findMany({
@@ -90,17 +150,18 @@ async function approvedImportedRecords(recordTypes, take = 500) {
         const publicRecord = {
         id: record.id,
         ...record.publicSafe,
-        state: record.state || record.publicSafe?.state,
-        municipality: record.municipality || record.publicSafe?.municipality,
-        publicLocation: record.publicLocation || record.publicSafe?.publicLocation,
-        zone: record.zone || record.publicSafe?.zone,
+        state: record.publicSafe?.state || record.state,
+        municipality: record.publicSafe?.municipality || record.municipality,
+        publicLocation: record.publicSafe?.publicLocation || record.publicLocation,
+        zone: record.publicSafe?.zone || record.zone,
         latitudePrivate: record.latitudePrivate,
         longitudePrivate: record.longitudePrivate,
         verificationStatus: record.verificationStatus,
         };
+        const safePublicRecord = normalizeImportedPersonPublicFields(publicRecord, record.recordType);
         return stripInternalPublicFields(operationalResourceTypes.has(record.recordType)
-          ? withOperationalClassification(publicRecord, record.recordType)
-          : publicRecord);
+          ? withOperationalClassification(safePublicRecord, record.recordType)
+          : safePublicRecord);
       })
       .filter(Boolean);
   } catch {

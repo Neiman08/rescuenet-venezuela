@@ -620,12 +620,16 @@ test("public hospitalized endpoint returns publicSafe without private hospital d
     medicalPrivate: { condition: "Diagnostico sensible" },
     locationPrivate: { room: "402", bed: "B" },
     rawPayload: { cedula: "V-12345678", telefono: "0412-1234567", room: "402" },
+    state: "POLITRAUMATISMO57",
+    status: "POLITRAUMATISMO57",
+    bed: "Cama 12",
+    room: "Habitacion 402",
     privacyLevel: "standard",
     verificationStatus: "APROBADO",
     publicSafe: {
       fullName: "Persona Hospitalizada",
       approximateAge: "30",
-      status: "Hospitalizado",
+      status: "POLITRAUMATISMO57",
       hospitalName: "Hospital Publico",
       zone: "Caracas",
       recordType: "hospitalized_person",
@@ -639,8 +643,13 @@ test("public hospitalized endpoint returns publicSafe without private hospital d
     const body = response._getJSONData();
     assert.equal(body.data.length, 1);
     assert.equal(body.data[0].fullName, "Persona Hospitalizada");
+    assert.equal(body.data[0].status, "Hospitalizado");
+    assert.equal(body.data[0].state, undefined);
     assert.equal(JSON.stringify(body).includes("12345678"), false);
     assert.equal(JSON.stringify(body).includes("Diagnostico sensible"), false);
+    assert.equal(JSON.stringify(body).includes("POLITRAUMATISMO"), false);
+    assert.equal(JSON.stringify(body).includes("Cama"), false);
+    assert.equal(JSON.stringify(body).includes("Habitacion"), false);
     assert.equal(JSON.stringify(body).includes("402"), false);
     assert.equal(JSON.stringify(body).includes("rawPayload"), false);
   } finally {
