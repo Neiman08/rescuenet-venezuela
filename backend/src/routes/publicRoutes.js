@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { publicController, publicSchemas } from "../controllers/publicController.js";
+import { authenticate } from "../middleware/auth.js";
 import { antiSpam, publicSubmissionRateLimit } from "../middleware/publicGuards.js";
 import { validate } from "../middleware/validate.js";
 
@@ -21,8 +22,8 @@ router.get("/persons", publicController.familySearch);
 router.get("/map", publicController.publicMap);
 router.get("/map/public", publicController.publicMap);
 router.get("/dashboard/public", publicController.publicDashboard);
-router.get("/organizations/public", publicController.listPublicOrganizations);
-router.get("/donations/public", publicController.listPublicDonations);
+router.get("/organizations/public", authenticate, publicController.listPublicOrganizations);
+router.get("/donations/public", authenticate, publicController.listPublicDonations);
 router.get("/centers", publicController.helpCenters);
 router.get("/help-centers/public", publicController.helpCenters);
 router.post("/help-centers", publicSubmissionRateLimit, antiSpam, validate(publicSchemas.helpCenter), publicController.createHelpCenter);

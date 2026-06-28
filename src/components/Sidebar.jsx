@@ -1,5 +1,6 @@
-import { NavLink } from "react-router-dom";
-import { HeartHandshake } from "lucide-react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { HeartHandshake, LogIn, LogOut } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 import { navigationRoutes } from "../config/routes";
 
 function LinkItem({ link, compact = false }) {
@@ -20,6 +21,17 @@ function LinkItem({ link, compact = false }) {
 }
 
 export default function Sidebar() {
+  const { isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const visibleRoutes = navigationRoutes.filter((route) => !route.protected || isAuthenticated);
+  const mobileRoutes = visibleRoutes.slice(0, 5);
+
+  function handleLogout() {
+    logout();
+    navigate("/", { replace: true });
+  }
+
   return (
     <>
       <aside className="hidden md:flex w-64 bg-navy text-white min-h-screen flex-col sticky top-0">
@@ -32,19 +44,28 @@ export default function Sidebar() {
             <p className="text-[11px] tracking-[0.25em] text-blue-100">VENEZUELA</p>
           </div>
         </div>
-        <nav className="p-3 flex-1 space-y-1">
-          {navigationRoutes.map((link) => (
+        <nav className="p-3 flex-1 space-y-1 overflow-y-auto">
+          {visibleRoutes.map((link) => (
             <LinkItem key={link.path} link={link} />
           ))}
         </nav>
-        <div className="p-4">
+        <div className="p-4 space-y-2">
           <NavLink to="/reportar" className="block text-center bg-rescueRed rounded-xl py-3 font-bold">
             REPORTAR EMERGENCIA
           </NavLink>
+          {isAuthenticated ? (
+            <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 rounded-xl py-2 text-sm text-blue-100 hover:bg-white/10 transition">
+              <LogOut size={16} /> Cerrar sesion
+            </button>
+          ) : (
+            <NavLink to="/login" className="flex items-center justify-center gap-2 rounded-xl py-2 text-sm text-blue-100 hover:bg-white/10 transition">
+              <LogIn size={16} /> Acceso institucional
+            </NavLink>
+          )}
         </div>
       </aside>
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-navy text-white grid grid-cols-5 gap-1 px-2 py-2">
-        {navigationRoutes.slice(0, 5).map((link) => (
+        {mobileRoutes.map((link) => (
           <LinkItem key={link.path} link={link} compact />
         ))}
       </nav>

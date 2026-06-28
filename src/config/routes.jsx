@@ -41,32 +41,56 @@ import SearchFamily from "../pages/SearchFamily";
 import VerifiedOrganizations from "../pages/VerifiedOrganizations";
 import { permissions } from "../security/accessControl";
 
+// Backend permission strings (must match PERMISSIONS in backend/src/auth/permissions.js)
+export const PERM = {
+  DONATIONS_READ: "donations:read",
+  ORGANIZATIONS_MANAGE: "organizations:manage",
+  LOGISTICS_MANAGE: "logistics:manage",
+  SYSTEM_ADMIN: "system:admin",
+  AUDIT_READ: "audit:read",
+  RESCUED_WRITE: "rescued:write",
+  EXACT_LOCATION: "map:read",
+  RESPONDERS: "map:read",
+  INGESTION: "ingestion:manage",
+};
+
 export const appRoutes = [
-  { path: "/", label: "Inicio", navLabel: "Inicio", icon: LayoutDashboard, element: <Dashboard />, permission: permissions.VIEW_PUBLIC_DASHBOARD, priority: "public" },
-  { path: "/login", label: "Acceso institucional", element: <Login />, permission: permissions.VIEW_PUBLIC_DASHBOARD, priority: "public" },
-  { path: "/mapa", label: "Mapa en vivo", navLabel: "Mapa", icon: Map, element: <LiveMap />, permission: permissions.VIEW_PUBLIC_DASHBOARD, priority: "operational" },
-  { path: "/operaciones", label: "Centro de operaciones", navLabel: "Operaciones", icon: Radio, element: <EmergencyOperations />, permission: permissions.MANAGE_RESPONDERS, priority: "critical" },
-  { path: "/reportar", label: "Reportar emergencia", navLabel: "Reportar", icon: Siren, element: <ReportEmergency />, permission: permissions.REPORT_EMERGENCY, priority: "critical" },
-  { path: "/estoy-a-salvo", label: "Estoy a salvo", element: <SafeReport />, permission: permissions.REPORT_SAFE, priority: "critical" },
-  { path: "/buscar-familiar", label: "Buscar familiar", element: <SearchFamily />, permission: permissions.SEARCH_FAMILY, priority: "public" },
-  { path: "/publicar-busqueda", label: "Publicar busqueda", element: <PublishMissing />, permission: permissions.SEARCH_FAMILY, priority: "public" },
-  { path: "/registrar-rescatado", label: "Registrar rescatado", element: <RegisterRescued />, permission: permissions.MANAGE_RESCUED, priority: "restricted" },
-  { path: "/ubicacion-rescate", label: "Ubicacion de rescate", element: <RescueLocation />, permission: permissions.VIEW_EXACT_LOCATION, priority: "restricted" },
-  { path: "/personas", label: "Personas", navLabel: "Personas", icon: Users, element: <PersonasPage />, permission: permissions.VIEW_RESCUED_PUBLIC, priority: "operational" },
-  { path: "/personas/:id", label: "Detalle de persona", element: <PersonDetail />, permission: permissions.VIEW_RESCUED_PUBLIC, priority: "sensitive" },
-  { path: "/coincidencias", label: "Coincidencias", element: <MatchResults />, permission: permissions.SEARCH_FAMILY, priority: "sensitive" },
-  { path: "/centros", label: "Centros", navLabel: "Centros", icon: Building2, element: <Centers />, permission: permissions.MANAGE_CENTERS, priority: "operational" },
-  { path: "/logistica", label: "Logistica humanitaria", navLabel: "Logistica", icon: PackageCheck, element: <HumanitarianLogistics />, permission: permissions.MANAGE_LOGISTICS, priority: "humanitarian" },
-  { path: "/rescatistas", label: "Rescatistas", navLabel: "Rescatistas", icon: ShieldCheck, element: <RescuersPanel />, permission: permissions.MANAGE_RESPONDERS, priority: "restricted" },
-  { path: "/donaciones", label: "Donaciones", navLabel: "Donaciones", icon: HandCoins, element: <DonationsOverview />, permission: permissions.VIEW_DONATIONS, priority: "public" },
-  { path: "/organizaciones", label: "Organizaciones", navLabel: "ONG", icon: UserCheck, element: <VerifiedOrganizations />, permission: permissions.VERIFY_ORGANIZATIONS, priority: "humanitarian" },
-  { path: "/donacion/:id", label: "Auditoria de donacion", element: <DonationAudit />, permission: permissions.VIEW_DONATIONS, priority: "public" },
-  { path: "/gastos", label: "Gastos", element: <Expenses />, permission: permissions.AUDIT_DONATIONS, priority: "audit" },
-  { path: "/gobierno", label: "Gobierno", navLabel: "Gobierno", icon: BarChart3, element: <GovernmentPanel />, permission: permissions.VIEW_GOVERNMENT_PANEL, priority: "restricted" },
-  { path: "/internacional", label: "Internacional", navLabel: "Global", icon: Globe2, element: <InternationalPanel />, permission: permissions.VIEW_INTERNATIONAL_PANEL, priority: "humanitarian" },
-  { path: "/ia", label: "Arquitectura IA", navLabel: "IA", icon: BrainCircuit, element: <AIReadiness />, permission: permissions.ADMINISTER_AI, priority: "restricted" },
-  { path: "/admin", label: "Administracion", navLabel: "Admin", icon: Settings, element: <AdminVerification />, permission: permissions.ADMINISTER_SYSTEM, priority: "restricted" },
-  { path: "/admin/ingesta", label: "Ingesta institucional", element: <InstitutionalIngestionReview />, permission: permissions.ADMINISTER_SYSTEM, priority: "restricted" },
+  // ── Public routes ─────────────────────────────────────────────────────────
+  { path: "/", label: "Inicio", navLabel: "Inicio", icon: LayoutDashboard, element: <Dashboard />, priority: "public" },
+  { path: "/login", label: "Acceso institucional", element: <Login />, priority: "public" },
+  { path: "/mapa", label: "Mapa en vivo", navLabel: "Mapa", icon: Map, element: <LiveMap />, priority: "public" },
+  { path: "/operaciones", label: "Centro de operaciones", navLabel: "Operaciones", icon: Radio, element: <EmergencyOperations />, priority: "public" },
+  { path: "/reportar", label: "Reportar emergencia", navLabel: "Reportar", icon: Siren, element: <ReportEmergency />, priority: "public" },
+  { path: "/estoy-a-salvo", label: "Estoy a salvo", element: <SafeReport />, priority: "public" },
+  { path: "/buscar-familiar", label: "Buscar familiar", element: <SearchFamily />, priority: "public" },
+  { path: "/publicar-busqueda", label: "Publicar busqueda", element: <PublishMissing />, priority: "public" },
+  { path: "/personas", label: "Personas", navLabel: "Personas", icon: Users, element: <PersonasPage />, priority: "public" },
+  { path: "/personas/:id", label: "Detalle de persona", element: <PersonDetail />, priority: "public" },
+  { path: "/centros", label: "Centros", navLabel: "Centros", icon: Building2, element: <Centers />, priority: "public" },
+  { path: "/gobierno", label: "Gobierno", navLabel: "Gobierno", icon: BarChart3, element: <GovernmentPanel />, priority: "public" },
+
+  // ── Protected routes ───────────────────────────────────────────────────────
+  { path: "/logistica", label: "Logistica humanitaria", navLabel: "Logistica", icon: PackageCheck, element: <HumanitarianLogistics />, priority: "humanitarian", protected: true, requiredPermission: PERM.LOGISTICS_MANAGE },
+  { path: "/rescatistas", label: "Rescatistas", navLabel: "Rescatistas", icon: ShieldCheck, element: <RescuersPanel />, priority: "restricted", protected: true, requiredPermission: PERM.RESPONDERS },
+  { path: "/donaciones", label: "Donaciones", navLabel: "Donaciones", icon: HandCoins, element: <DonationsOverview />, priority: "restricted", protected: true, requiredPermission: PERM.DONATIONS_READ },
+  { path: "/organizaciones", label: "Organizaciones", navLabel: "ONG", icon: UserCheck, element: <VerifiedOrganizations />, priority: "restricted", protected: true, requiredPermission: PERM.ORGANIZATIONS_MANAGE },
+  { path: "/donacion/:id", label: "Auditoria de donacion", element: <DonationAudit />, priority: "restricted", protected: true, requiredPermission: PERM.DONATIONS_READ },
+  { path: "/gastos", label: "Gastos", element: <Expenses />, priority: "restricted", protected: true, requiredPermission: PERM.AUDIT_READ },
+  { path: "/internacional", label: "Internacional", navLabel: "Global", icon: Globe2, element: <InternationalPanel />, priority: "restricted", protected: true, requiredPermission: PERM.LOGISTICS_MANAGE },
+  { path: "/ia", label: "Arquitectura IA", navLabel: "IA", icon: BrainCircuit, element: <AIReadiness />, priority: "restricted", protected: true, requiredPermission: PERM.SYSTEM_ADMIN },
+  { path: "/admin", label: "Administracion", navLabel: "Admin", icon: Settings, element: <AdminVerification />, priority: "restricted", protected: true, requiredPermission: PERM.SYSTEM_ADMIN },
+  { path: "/admin/ingesta", label: "Ingesta institucional", element: <InstitutionalIngestionReview />, priority: "restricted", protected: true, requiredPermission: PERM.INGESTION },
+  { path: "/coincidencias", label: "Coincidencias", element: <MatchResults />, priority: "restricted", protected: true },
+  { path: "/registrar-rescatado", label: "Registrar rescatado", element: <RegisterRescued />, priority: "restricted", protected: true, requiredPermission: PERM.RESCUED_WRITE },
+  { path: "/ubicacion-rescate", label: "Ubicacion de rescate", element: <RescueLocation />, priority: "restricted", protected: true, requiredPermission: PERM.EXACT_LOCATION },
 ];
 
+// Only routes with icons appear in the sidebar nav
 export const navigationRoutes = appRoutes.filter((route) => route.icon);
+
+// Only public nav routes (shown to unauthenticated users)
+export const publicNavigationRoutes = navigationRoutes.filter((route) => !route.protected);
+
+// The old permission field is kept in accessControl.js but nav enforcement
+// now uses the `protected` flag + ProtectedRoute component in App.jsx
+void permissions;

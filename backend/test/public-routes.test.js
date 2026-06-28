@@ -949,3 +949,59 @@ test("public hospitalized endpoint repairs legacy google drive split surnames", 
     prisma.importedHumanitarianRecord.findMany = originals.imported;
   }
 });
+
+test("donations/public requires authentication — returns 401 without token", async () => {
+  const response = await dispatch(createApp(), { url: "/api/donations/public" });
+  assert.equal(response.statusCode, 401);
+});
+
+test("organizations/public requires authentication — returns 401 without token", async () => {
+  const response = await dispatch(createApp(), { url: "/api/organizations/public" });
+  assert.equal(response.statusCode, 401);
+});
+
+test("donations/public is accessible with a valid token", async () => {
+  const token = jwt.sign(
+    { roles: ["ADMINISTRADOR"], permissions: ["donations:read", "system:admin"] },
+    env.JWT_ACCESS_SECRET,
+    { subject: "test-admin-id", expiresIn: "1h" },
+  );
+  const origFindMany = prisma.donation.findMany;
+  const origUser = prisma.user.findFirst;
+  prisma.donation.findMany = async () => [];
+  prisma.user.findFirst = async () => ({ id: "test-admin-id", email: "a@b.com", deletedAt: null, isActive: true, roles: [{ role: { name: "ADMINISTRADOR" } }] });
+
+  try {
+    const response = await dispatch(createApp(), {
+      url: "/api/donations/public",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(response.statusCode, 200);
+  } finally {
+    prisma.donation.findMany = origFindMany;
+    prisma.user.findFirst = origUser;
+  }
+});
+
+test("organizations/public is accessible with a valid token", async () => {
+  const token = jwt.sign(
+    { roles: ["ADMINISTRADOR"], permissions: ["organizations:manage", "system:admin"] },
+    env.JWT_ACCESS_SECRET,
+    { subject: "test-admin-id", expiresIn: "1h" },
+  );
+  const origFindMany = prisma.organization.findMany;
+  const origUser = prisma.user.findFirst;
+  prisma.organization.findMany = async () => [];
+  prisma.user.findFirst = async () => ({ id: "test-admin-id", email: "a@b.com", deletedAt: null, isActive: true, roles: [{ role: { name: "ADMINISTRADOR" } }] });
+
+  try {
+    const response = await dispatch(createApp(), {
+      url: "/api/organizations/public",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(response.statusCode, 200);
+  } finally {
+    prisma.organization.findMany = origFindMany;
+    prisma.user.findFirst = origUser;
+  }
+});
