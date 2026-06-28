@@ -8,9 +8,9 @@ export default function RescuersPanel() {
     <div className="space-y-6">
       <SectionTitle title="Panel de rescatistas" subtitle="Asignacion de equipos, rutas y registros operativos por zona." action={<Link to="/ubicacion-rescate" className="btn bg-navy text-white">Ubicacion sensible</Link>} />
       <div className="grid md:grid-cols-4 gap-4">
-        <Card icon={<ShieldCheck />} title="Equipos activos" value="38" />
-        <Card icon={<Truck />} title="Unidades moviles" value="72" />
-        <Card icon={<Radio />} title="Canales abiertos" value="14" />
+        <Card icon={<ShieldCheck />} title="Equipos activos" value="0" />
+        <Card icon={<Truck />} title="Unidades moviles" value="0" />
+        <Card icon={<Radio />} title="Canales abiertos" value="0" />
         <Card icon={<MapPinned />} title="Zonas asignadas" value={affectedZones.length} />
       </div>
       <div className="grid lg:grid-cols-2 gap-6">
