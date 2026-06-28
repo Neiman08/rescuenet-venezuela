@@ -16,7 +16,7 @@ const groups = [
 function normalizePerson(item, fallbackType) {
   const group = groups.find((entry) => entry.key === fallbackType);
   return {
-    id: item.code || item.id,
+    id: item.id,
     name: item.name || item.fullName || "Informacion protegida",
     type: group?.typeLabel || item.type || item.recordType || fallbackType,
     age: item.age || item.approximateAge || "No indicada",
@@ -82,12 +82,12 @@ export default function RescuedList() {
         {activeRows.length ? (
           <DataTable
             columns={[
-              { key: "name", label: "Nombre" },
-              { key: "age", label: "Edad" },
-              { key: "sex", label: "Sexo" },
-              { key: "status", label: "Estado", badge: true },
+              { key: "name", label: "Nombre", align: "left", wrap: true },
+              { key: "age", label: "Edad", hideOnMobile: true },
+              { key: "sex", label: "Sexo", hideOnMobile: true },
+              { key: "status", label: "Estado", badge: true, hideOnMobile: true },
               { key: "publicLocation", label: "Zona", wrap: true },
-              { key: "source", label: "Fuente", wrap: true },
+              { key: "source", label: "Fuente", wrap: true, hideOnMobile: true },
             ]}
             rows={activeRows}
           />

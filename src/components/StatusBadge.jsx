@@ -19,6 +19,13 @@ export default function StatusBadge({ status }) {
     "En revision": "bg-yellow-100 text-yellow-700",
     Nuevo: "bg-red-100 text-red-700",
     Confirmado: "bg-green-100 text-green-700",
+    Hospitalizado: "bg-blue-100 text-blue-700",
+    Desaparecido: "bg-red-100 text-red-700",
+    "Desaparecido/a": "bg-red-100 text-red-700",
+    Rescatado: "bg-green-100 text-green-700",
+    "Rescatado/a": "bg-green-100 text-green-700",
+    Localizado: "bg-green-100 text-green-700",
+    "A salvo": "bg-green-100 text-green-700",
   };
-  return <span className={`badge ${map[status] || "bg-slate-100 text-slate-700"}`}>{status}</span>;
+  return <span className={`badge ${map[status] || "bg-slate-100 text-slate-700"} max-w-28 overflow-hidden text-ellipsis sm:max-w-none`}>{status}</span>;
 }

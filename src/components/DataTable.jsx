@@ -7,7 +7,7 @@ export default function DataTable({ columns, rows, compact = true }) {
         <thead className="bg-slate-50 text-slate-500">
           <tr>
             {columns.map((column) => (
-              <th key={column.key} className={`${column.align === "left" ? "text-left" : "text-center"} font-bold px-2 md:px-3 py-2 whitespace-nowrap`}>
+              <th key={column.key} className={`${column.hideOnMobile ? "hidden sm:table-cell" : ""} ${column.align === "left" ? "text-left" : "text-center"} font-bold px-2 md:px-3 py-2 whitespace-nowrap`}>
                 {column.label}
               </th>
             ))}
@@ -19,7 +19,7 @@ export default function DataTable({ columns, rows, compact = true }) {
               {columns.map((column) => {
                 const value = row[column.key];
                 return (
-                  <td key={column.key} className={`px-2 md:px-3 py-2 align-middle ${column.align === "left" ? "text-left" : "text-center"} ${column.wrap ? "whitespace-normal min-w-32" : "whitespace-nowrap"}`}>
+                  <td key={column.key} className={`${column.hideOnMobile ? "hidden sm:table-cell" : ""} px-2 md:px-3 py-2 align-middle ${column.align === "left" ? "text-left" : "text-center"} ${column.wrap ? "whitespace-normal min-w-28 sm:min-w-32" : "whitespace-nowrap"}`}>
                     {column.badge ? <StatusBadge status={value} /> : column.render ? column.render(row) : value}
                   </td>
                 );

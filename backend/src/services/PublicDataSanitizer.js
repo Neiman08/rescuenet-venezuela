@@ -104,7 +104,6 @@ export class PublicDataSanitizer {
     const restricted = person.isMinor;
     return {
       id: person.id,
-      code: person.code,
       name: restricted ? "Informacion protegida" : person.name,
       approximateAge: person.approximateAge,
       sex: person.sex,

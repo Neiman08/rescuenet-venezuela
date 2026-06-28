@@ -28,7 +28,7 @@ export default function SearchFamily() {
     publicApi.searchFamily(params)
       .then((payload) => {
         const nextRows = (payload.data || []).map((item) => ({
-          id: item.code || item.id,
+          id: item.id,
           name: item.name,
           age: item.age,
           publicLocation: item.publicLocation,
@@ -82,13 +82,11 @@ export default function SearchFamily() {
       {status === "empty" && <div className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">{noApprovedDataMessage}</div>}
       <DataTable
         columns={[
-          { key: "name", label: "Persona" },
-          { key: "age", label: "Edad" },
-          { key: "publicLocation", label: "Zona", wrap: true },
-          { key: "hospital", label: "Hospital", wrap: true },
-          { key: "status", label: "Estado", badge: true },
+          { key: "name", label: "Persona", align: "left", wrap: true },
           { key: "type", label: "Tipo" },
-          { key: "source", label: "Fuente", wrap: true },
+          { key: "age", label: "Edad", hideOnMobile: true },
+          { key: "publicLocation", label: "Zona publica", wrap: true },
+          { key: "status", label: "Estado", badge: true, hideOnMobile: true },
         ]}
         rows={filteredRows}
       />

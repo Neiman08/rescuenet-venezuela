@@ -257,6 +257,35 @@ test("public missing endpoint does not request hospitalized imported records", a
   }
 });
 
+test("public rescued endpoint does not expose internal person codes", async () => {
+  const originalRescued = prisma.rescuedPerson.findMany;
+  const originalImported = prisma.importedHumanitarianRecord.findMany;
+  prisma.rescuedPerson.findMany = async () => [{
+    id: "rescued-1",
+    code: "RSC-VERY-LONG-INTERNAL-CODE",
+    name: "Persona Rescatada",
+    approximateAge: "30",
+    sex: "No indicado",
+    status: "Rescatado",
+    affectedZone: null,
+    hospital: null,
+    shelter: null,
+    createdAt: new Date(),
+  }];
+  prisma.importedHumanitarianRecord.findMany = async () => [];
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/rescued/public" });
+    assert.equal(response.statusCode, 200);
+    const body = response._getJSONData();
+    assert.equal(body.data[0].code, undefined);
+    assert.equal(JSON.stringify(body).includes("RSC-VERY-LONG-INTERNAL-CODE"), false);
+  } finally {
+    prisma.rescuedPerson.findMany = originalRescued;
+    prisma.importedHumanitarianRecord.findMany = originalImported;
+  }
+});
+
 test("public help centers endpoint exposes approved publicSafe centers only", async () => {
   const originalHospital = prisma.hospital.findMany;
   const originalShelter = prisma.shelter.findMany;
@@ -546,6 +575,7 @@ test("public family search consolidates safe public data without raw payload", a
     assert.equal(response.statusCode, 200);
     const body = response._getJSONData();
     assert.equal(body.data[0].name, "Informacion protegida");
+    assert.equal(body.data[0].code, undefined);
     assert.equal(body.data[0].rawPayload, undefined);
     assert.equal(JSON.stringify(body).includes("0412"), false);
     assert.equal(JSON.stringify(body).includes("V-12345678"), false);
@@ -594,6 +624,7 @@ test("public family search can match cedula privately without exposing sensitive
     const body = response._getJSONData();
     assert.equal(body.data.length, 1);
     assert.equal(body.data[0].name, "Persona Publica");
+    assert.equal(body.data[0].code, undefined);
     assert.equal(JSON.stringify(body).includes("12345678"), false);
     assert.equal(JSON.stringify(body).includes("0412"), false);
     assert.equal(JSON.stringify(body).includes("rawPayload"), false);

@@ -209,7 +209,6 @@ function familyResult(base) {
   return {
     id: base.id,
     type: base.type,
-    code: base.code,
     name: base.name || "Informacion protegida",
     age: base.age || "No indicada",
     sex: base.sex,
