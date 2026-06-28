@@ -42,3 +42,5 @@ services:
         sync: false
       - key: VITE_ENABLE_DEMO_DATA
         value: "false"
+      - key: VITE_PUBLIC_WHATSAPP_NUMBER
+        value: "12245914415"
