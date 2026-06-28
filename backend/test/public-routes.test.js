@@ -782,3 +782,39 @@ test("public hospitalized endpoint filters imported header rows", async () => {
     prisma.importedHumanitarianRecord.findMany = originals.imported;
   }
 });
+
+test("public hospitalized endpoint repairs legacy google drive split surnames", async () => {
+  const originals = {
+    admissions: prisma.hospitalAdmission.findMany,
+    imported: prisma.importedHumanitarianRecord.findMany,
+  };
+  prisma.hospitalAdmission.findMany = async () => [];
+  prisma.importedHumanitarianRecord.findMany = async () => [
+    {
+      id: "legacy-1",
+      sourceName: "SISMO 2026 VZLA - Google Drive Hospitales",
+      recordType: "hospitalized_person",
+      fullName: "José",
+      zone: "Ramírez",
+      verificationStatus: "APROBADO",
+      publicSafe: {
+        fullName: "José",
+        status: "Hospitalizado",
+        zone: "Ramírez",
+        sourceName: "SISMO 2026 VZLA - Google Drive Hospitales",
+      },
+    },
+  ];
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/hospitalized/public" });
+    assert.equal(response.statusCode, 200);
+    const body = response._getJSONData();
+    assert.equal(body.data.length, 1);
+    assert.equal(body.data[0].fullName, "José Ramírez");
+    assert.equal(body.data[0].zone, "Zona general protegida");
+  } finally {
+    prisma.hospitalAdmission.findMany = originals.admissions;
+    prisma.importedHumanitarianRecord.findMany = originals.imported;
+  }
+});

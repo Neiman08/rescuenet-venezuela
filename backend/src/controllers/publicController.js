@@ -149,6 +149,31 @@ function isHeaderPersonRecord(record) {
   return words.length > 0 && words.every((word) => publicHeaderPersonNames.has(word));
 }
 
+function looksLikeMisplacedSurname(value) {
+  const text = String(value || "").trim();
+  if (!text || text.length < 2 || text.length > 40) return false;
+  if (/[0-9,.;:/\\]/.test(text)) return false;
+  if (/zona|municipio|hospital|refugio|centro|general|protegida|caracas|miranda|guaira|vargas|libertador|guaicaipuro/i.test(text)) return false;
+  return /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]+$/.test(text);
+}
+
+function repairLegacyGoogleDriveHospitalizedPublicRecord(record, sourceName) {
+  if (record.recordType !== "hospitalized_person" || !/google drive hospitales/i.test(sourceName || "")) return record;
+  const fullName = String(record.fullName || record.name || "").trim();
+  const misplacedSurname = String(record.zone || "").trim();
+  if (fullName.split(/\s+/).filter(Boolean).length === 1 && looksLikeMisplacedSurname(misplacedSurname)) {
+    return {
+      ...record,
+      fullName: `${fullName} ${misplacedSurname}`,
+      name: `${fullName} ${misplacedSurname}`,
+      zone: "Zona general protegida",
+      currentPlace: record.currentPlace === misplacedSurname ? "Zona general protegida" : record.currentPlace,
+      lastSeenPlace: record.lastSeenPlace === misplacedSurname ? "Zona general protegida" : record.lastSeenPlace,
+    };
+  }
+  return record;
+}
+
 function publicPersonStatus(recordType, status) {
   if (recordType === "hospitalized_person") return "Hospitalizado";
   if (looksLikeMedicalText(status)) return "Informacion protegida";
@@ -184,6 +209,7 @@ async function approvedImportedRecords(recordTypes, take = 500) {
         const publicRecord = {
         id: record.id,
         ...record.publicSafe,
+        recordType: record.publicSafe?.recordType || record.recordType,
         state: record.publicSafe?.state || record.state,
         municipality: record.publicSafe?.municipality || record.municipality,
         publicLocation: record.publicSafe?.publicLocation || record.publicLocation,
@@ -192,7 +218,10 @@ async function approvedImportedRecords(recordTypes, take = 500) {
         longitudePrivate: record.longitudePrivate,
         verificationStatus: record.verificationStatus,
         };
-        const safePublicRecord = normalizeImportedPersonPublicFields(publicRecord, record.recordType);
+        const safePublicRecord = repairLegacyGoogleDriveHospitalizedPublicRecord(
+          normalizeImportedPersonPublicFields(publicRecord, record.recordType),
+          record.sourceName,
+        );
         if (familySearchTypes.includes(record.recordType) && isHeaderPersonRecord(safePublicRecord)) return null;
         return stripInternalPublicFields(operationalResourceTypes.has(record.recordType)
           ? withOperationalClassification(safePublicRecord, record.recordType)
