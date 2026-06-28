@@ -75,6 +75,9 @@ function stripInternalPublicFields(record) {
   delete safeRecord.documentPrivate;
   delete safeRecord.medicalPrivate;
   delete safeRecord.locationPrivate;
+  delete safeRecord.sourceUrl;
+  delete safeRecord.sourceRecordId;
+  delete safeRecord.possibleDuplicate;
   return safeRecord;
 }
 

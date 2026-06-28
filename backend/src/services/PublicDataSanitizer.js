@@ -1,9 +1,3 @@
-function maskPhone(phone) {
-  if (!phone) return undefined;
-  const digits = String(phone).replace(/\D/g, "");
-  if (digits.length <= 4) return "****";
-  return `${"*".repeat(Math.max(digits.length - 4, 4))}${digits.slice(-4)}`;
-}
 
 function zoneSummary(zone) {
   if (!zone) return undefined;
@@ -76,7 +70,6 @@ export class PublicDataSanitizer {
     return {
       id: report.id,
       fullName: report.fullName,
-      phone: maskPhone(report.phone),
       currentPlace: sanitizePublicPlaceText(report.currentPlace, report.affectedZone),
       verificationStatus: report.verificationStatus,
       affectedZone: zoneSummary(report.affectedZone),

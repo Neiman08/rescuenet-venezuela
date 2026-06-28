@@ -23,7 +23,7 @@ test("PublicDataSanitizer hides exact and medical details from rescued minors", 
   assert.equal(sanitized.injuriesSummary, undefined);
 });
 
-test("PublicDataSanitizer masks safe-report phone numbers", () => {
+test("PublicDataSanitizer omits phone from safe-report response", () => {
   const sanitized = PublicDataSanitizer.safeReport({
     id: "safe-1",
     fullName: "Maria",
@@ -32,8 +32,7 @@ test("PublicDataSanitizer masks safe-report phone numbers", () => {
     verificationStatus: "self_reported",
   });
 
-  assert.equal(sanitized.phone.endsWith("4567"), true);
-  assert.equal(sanitized.phone.includes("412"), false);
+  assert.equal(sanitized.phone, undefined);
 });
 
 test("PublicDataSanitizer degrades emergency publicLocation and removes exact details", () => {
