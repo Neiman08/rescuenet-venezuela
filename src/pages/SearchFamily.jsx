@@ -7,6 +7,17 @@ import DataTable from "../components/DataTable";
 import { noApprovedDataMessage, noRealDataMessage } from "../config/demoData";
 import { publicApi } from "../lib/api";
 
+function labelForPersonType(type) {
+  const labels = {
+    missing_person: "Desaparecido",
+    hospitalized_person: "Hospitalizado",
+    rescued_person: "Rescatado",
+    safe_person: "Localizado",
+    trapped_person: "Atrapado",
+  };
+  return labels[type] || type || "Persona";
+}
+
 export default function SearchFamily() {
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState([]);
@@ -23,7 +34,7 @@ export default function SearchFamily() {
           publicLocation: item.publicLocation,
           status: item.status,
           privacy: item.privacyLevel === "restricted" ? "Informacion protegida" : "Resumen publico",
-          type: item.type,
+          type: labelForPersonType(item.type),
           hospital: item.hospital || "No indicado",
           source: item.source || "RescueNet",
         }));
@@ -73,12 +84,11 @@ export default function SearchFamily() {
         columns={[
           { key: "name", label: "Persona" },
           { key: "age", label: "Edad" },
-          { key: "publicLocation", label: "Zona publica" },
-          { key: "hospital", label: "Hospital" },
+          { key: "publicLocation", label: "Zona", wrap: true },
+          { key: "hospital", label: "Hospital", wrap: true },
           { key: "status", label: "Estado", badge: true },
           { key: "type", label: "Tipo" },
-          { key: "source", label: "Fuente" },
-          { key: "privacy", label: "Privacidad" },
+          { key: "source", label: "Fuente", wrap: true },
         ]}
         rows={filteredRows}
       />

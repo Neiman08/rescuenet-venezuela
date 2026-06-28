@@ -237,6 +237,26 @@ test("public missing endpoint merges approved publicSafe records without rawPayl
   }
 });
 
+test("public missing endpoint does not request hospitalized imported records", async () => {
+  const originalMissing = prisma.missingPersonReport.findMany;
+  const originalImported = prisma.importedHumanitarianRecord.findMany;
+  let requestedTypes = [];
+  prisma.missingPersonReport.findMany = async () => [];
+  prisma.importedHumanitarianRecord.findMany = async ({ where }) => {
+    requestedTypes = where.recordType.in;
+    return [];
+  };
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/missing/public" });
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(requestedTypes, ["missing_person"]);
+  } finally {
+    prisma.missingPersonReport.findMany = originalMissing;
+    prisma.importedHumanitarianRecord.findMany = originalImported;
+  }
+});
+
 test("public help centers endpoint exposes approved publicSafe centers only", async () => {
   const originalHospital = prisma.hospital.findMany;
   const originalShelter = prisma.shelter.findMany;
@@ -453,11 +473,15 @@ test("public dashboard counts only affected operational resources", async () => 
     { id: "h-out", name: "Hospital Apure", affectedZone: { state: "Apure", municipality: "San Fernando", sector: "San Fernando", lat: 7.89, lng: -67.47 } },
   ];
   prisma.shelter.findMany = async () => [];
-  prisma.missingPersonReport.count = async () => 0;
+  prisma.missingPersonReport.count = async () => 1;
   prisma.safeReport.count = async () => 0;
   prisma.rescuedPerson.count = async () => 0;
   prisma.hospitalAdmission.count = async () => 0;
-  prisma.importedHumanitarianRecord.count = async () => 0;
+  prisma.importedHumanitarianRecord.count = async ({ where }) => {
+    if (where.recordType === "missing_person") return 2;
+    if (where.recordType === "trapped_person") return 3;
+    return 0;
+  };
   prisma.importedHumanitarianRecord.findMany = async () => [];
 
   try {
@@ -466,6 +490,8 @@ test("public dashboard counts only affected operational resources", async () => 
     const body = response._getJSONData();
     assert.equal(body.stats.nearbyHospitals, 1);
     assert.equal(body.stats.activeCenters, 1);
+    assert.equal(body.stats.missingPeople, 3);
+    assert.equal(body.stats.trappedPeople, 3);
   } finally {
     prisma.emergencyReport.findMany = originals.overview;
     prisma.emergencyReport.count = originals.activeEmergencyCount;

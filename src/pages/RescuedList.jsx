@@ -86,9 +86,8 @@ export default function RescuedList() {
               { key: "age", label: "Edad" },
               { key: "sex", label: "Sexo" },
               { key: "status", label: "Estado", badge: true },
-              { key: "publicLocation", label: "Zona publica" },
-              { key: "type", label: "Tipo" },
-              { key: "source", label: "Fuente" },
+              { key: "publicLocation", label: "Zona", wrap: true },
+              { key: "source", label: "Fuente", wrap: true },
             ]}
             rows={activeRows}
           />

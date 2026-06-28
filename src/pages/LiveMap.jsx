@@ -6,6 +6,21 @@ import StatusBadge from "../components/StatusBadge";
 import { noApprovedDataMessage, noRealDataMessage } from "../config/demoData";
 import { publicApi } from "../lib/api";
 
+function mapCenterType(recordType) {
+  const labels = {
+    hospital: ["Hospital", "blue"],
+    shelter: ["Refugio", "green"],
+    collection_center: ["Centro de acopio", "purple"],
+    medical_point: ["Punto medico", "red"],
+    water_point: ["Punto de agua", "cyan"],
+    food_point: ["Punto de alimentos", "orange"],
+    pet_aid_center: ["Mascotas", "green"],
+    logistics_center: ["Logistica", "purple"],
+    help_center: ["Centro de ayuda", "purple"],
+  };
+  return labels[recordType] || [recordType || "Centro de ayuda", "purple"];
+}
+
 export default function LiveMap() {
   const [zones, setZones] = useState([]);
   const [reports, setReports] = useState([]);
@@ -18,7 +33,10 @@ export default function LiveMap() {
         const resourceReports = [
           ...(payload?.hospitals || []).map((item) => ({ id: `hospital-${item.id || item.name}`, type: "Hospital", status: item.status || item.operationalStatus || "Operativo", zone: item.affectedZone?.sector || item.publicLocation, affectedZone: item.affectedZone || item.affectedOperationalZone, color: "blue" })),
           ...(payload?.shelters || []).map((item) => ({ id: `shelter-${item.id || item.name}`, type: "Refugio", status: item.status || item.operationalStatus || "Operativo", zone: item.affectedZone?.sector || item.publicLocation, affectedZone: item.affectedZone || item.affectedOperationalZone, color: "green" })),
-          ...(payload?.helpCenters || []).map((item) => ({ id: `center-${item.id || item.name}`, type: item.recordType || "Centro de ayuda", status: item.operationalStatus || "Aprobado", zone: item.publicLocation || item.zone, affectedZone: item.affectedOperationalZone, color: "purple" })),
+          ...(payload?.helpCenters || []).map((item) => {
+            const [type, color] = mapCenterType(item.recordType);
+            return { id: `center-${item.id || item.name}`, type, status: item.operationalStatus || "Aprobado", zone: item.publicLocation || item.zone, affectedZone: item.affectedOperationalZone, color };
+          }),
         ];
         const nextReports = [...(payload?.reports || []), ...resourceReports];
         setZones(nextZones);

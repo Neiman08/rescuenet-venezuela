@@ -242,6 +242,7 @@ export const publicSchemas = {
       capacity: z.coerce.number().int().min(0).optional(),
       occupied: z.coerce.number().int().min(0).optional(),
       operationalStatus: z.string().default("PENDIENTE_VERIFICACION"),
+      observations: z.string().optional(),
       website: z.string().optional(),
       url: z.string().optional(),
     }),
@@ -361,7 +362,7 @@ export const publicController = {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
-    const imported = await approvedImportedRecords(["missing_person", "hospitalized_person", "trapped_person"]);
+    const imported = await approvedImportedRecords(["missing_person"]);
     res.json({ data: [...records.map(PublicDataSanitizer.missing), ...imported] });
   }),
 
@@ -441,10 +442,11 @@ export const publicController = {
       prisma.importedHumanitarianRecord.count({ where: { deletedAt: null, verificationStatus: "APROBADO", recordType: "hospitalized_person" } }),
       prisma.importedHumanitarianRecord.count({ where: { deletedAt: null, verificationStatus: "APROBADO", recordType: "trapped_person" } }),
     ]);
-    const missingPeople = missing + importedMissing + importedTrapped;
+    const missingPeople = missing + importedMissing;
     const rescuedPeople = rescued + importedRescued;
     const hospitalizedPeople = admissions + importedHospitalized;
     const safePeople = safe + importedSafe;
+    const trappedPeople = importedTrapped;
     const affectedHospitals = hospitals.filter(isInAffectedOperationalZone).length + helpCenters.filter((item) => item.operationalType === "hospital_near_disaster").length;
     const affectedShelters = shelters.filter(isInAffectedOperationalZone).length + helpCenters.filter((item) => item.operationalType === "shelter").length;
     const collectionCenters = helpCenters.filter((item) => item.operationalType === "collection_center").length;
@@ -459,9 +461,9 @@ export const publicController = {
         rescuedPeople,
         hospitalizedPeople,
         safePeople,
-        trappedPeople: importedTrapped,
-        publicPeopleTotal: missingPeople + rescuedPeople + hospitalizedPeople + safePeople,
-        registeredPeople: missingPeople + safePeople + rescuedPeople + hospitalizedPeople,
+        trappedPeople,
+        publicPeopleTotal: missingPeople + rescuedPeople + hospitalizedPeople + safePeople + trappedPeople,
+        registeredPeople: missingPeople + safePeople + rescuedPeople + hospitalizedPeople + trappedPeople,
         pendingReports: pendingEmergencies,
         criticalIncidents: criticalEmergencies,
         activeCenters: affectedHospitals + affectedShelters + collectionCenters + helpCenters.filter((item) => !["hospital_near_disaster", "shelter", "collection_center"].includes(item.operationalType)).length,
@@ -561,6 +563,7 @@ export const publicController = {
         acceptedItems: body.acceptedItems || [],
         operatingHours: body.operatingHours,
         operationalStatus: body.operationalStatus || "PENDIENTE_VERIFICACION",
+        description: body.observations,
         verificationStatus: "NO_VERIFICADO",
         privacyLevel: "standard",
         publicSafe: compactObject({
@@ -575,6 +578,7 @@ export const publicController = {
           acceptedItems: body.acceptedItems || [],
           operatingHours: body.operatingHours,
           operationalStatus: "PENDIENTE_VERIFICACION",
+          observations: body.observations,
         }),
         rawPayload: compactObject({
           ...body,

@@ -22,12 +22,13 @@ const initialCenterForm = {
   capacity: "",
   occupied: "",
   operationalStatus: "PENDIENTE_VERIFICACION",
+  observations: "",
 };
 
 export default function Centers() {
   const [rows, setRows] = useState([]);
   const [status, setStatus] = useState("loading");
-  const [filters, setFilters] = useState({ country: "", state: "", municipality: "", type: "", operationalStatus: "" });
+  const [filters, setFilters] = useState({ country: "", state: "", municipality: "", type: "", operationalStatus: "", accepts: "" });
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(initialCenterForm);
   const [submitStatus, setSubmitStatus] = useState("idle");
@@ -95,7 +96,8 @@ export default function Centers() {
       && (!filters.state || row.state === filters.state)
       && (!filters.municipality || row.municipality === filters.municipality)
       && (!filters.type || row.type === filters.type || itemText.includes(filters.type.toLowerCase()))
-      && (!filters.operationalStatus || (row.operationalStatus || row.status) === filters.operationalStatus);
+      && (!filters.operationalStatus || (row.operationalStatus || row.status) === filters.operationalStatus)
+      && (!filters.accepts || itemText.includes(filters.accepts));
   });
   const groupedRows = [
     ["Hospitales cercanos a la tragedia", filteredRows.filter((row) => row.operationalType === "hospital_near_disaster" || row.type === "hospital")],
@@ -139,11 +141,12 @@ export default function Centers() {
           <input className="input" name="occupied" value={form.occupied} onChange={updateForm} placeholder="Ocupados" />
           <input className="input md:col-span-2" name="addressPrivate" value={form.addressPrivate} onChange={updateForm} placeholder="Direccion exacta privada" />
           <input className="input" name="contactPrivate" value={form.contactPrivate} onChange={updateForm} placeholder="Contacto privado" />
+          <textarea className="input md:col-span-3 min-h-24" name="observations" value={form.observations} onChange={updateForm} placeholder="Observaciones operativas publicas, sin datos sensibles" />
           {submitMessage && <div className={`md:col-span-3 rounded-2xl p-4 text-sm font-semibold ${submitStatus === "success" ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>{submitMessage}</div>}
           <button className="btn bg-navy text-white md:col-span-3" disabled={submitStatus === "loading"}>{submitStatus === "loading" ? "Registrando..." : "Registrar y dejar pendiente de revision"}</button>
         </form>
       )}
-      <div className="card p-5 grid md:grid-cols-5 gap-3">
+      <div className="card p-5 grid md:grid-cols-6 gap-3">
         <select className="input" name="country" value={filters.country} onChange={updateFilter}>
           <option value="">Todos los paises</option>
           {countries.map((country) => <option key={country} value={country}>{country}</option>)}
@@ -166,6 +169,14 @@ export default function Centers() {
         <select className="input" name="operationalStatus" value={filters.operationalStatus} onChange={updateFilter}>
           <option value="">Activo/inactivo</option>
           {operationalStatuses.map((item) => <option key={item} value={item}>{item}</option>)}
+        </select>
+        <select className="input" name="accepts" value={filters.accepts} onChange={updateFilter}>
+          <option value="">Todos los insumos</option>
+          <option value="alimento">Acepta alimentos</option>
+          <option value="medicina">Acepta medicinas</option>
+          <option value="agua">Acepta agua</option>
+          <option value="ropa">Acepta ropa</option>
+          <option value="mascota">Acepta mascotas</option>
         </select>
       </div>
       {groupedRows.map(([title, items]) => (
