@@ -1,5 +1,6 @@
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import WhatsAppFloatingButton from "./WhatsAppFloatingButton";
 
 export default function Layout({ children }) {
   return (
@@ -9,6 +10,7 @@ export default function Layout({ children }) {
         <Header />
         <div className="p-4 md:p-6">{children}</div>
       </main>
+      <WhatsAppFloatingButton />
     </div>
   );
 }
