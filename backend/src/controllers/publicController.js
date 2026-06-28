@@ -115,6 +115,40 @@ function looksLikeMedicalText(value) {
   return /politraumat|trauma|fractur|quemadur|herid|lesion|lesión|diagnost|dolor|sangr|uci|grave|critico|crítico|estable|shock|contus|hematoma|paro|insuficiencia|neumon|diabet|hipertensi|embaraz|fallecid|muert|cadaver|cadáver/i.test(String(value || ""));
 }
 
+function normalizePublicText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+const publicHeaderPersonNames = new Set([
+  "nombre",
+  "nombre y apellido",
+  "nombres y apellidos",
+  "apellido",
+  "apellido segundo nombre",
+  "apellido segundo nombres",
+  "edad",
+  "edad actualizada",
+  "sexo",
+  "estado",
+  "hospital",
+  "observaciones",
+  "condicion",
+  "diagnostico",
+].map(normalizePublicText));
+
+function isHeaderPersonRecord(record) {
+  const name = normalizePublicText(record.fullName || record.name);
+  if (!name) return false;
+  if (publicHeaderPersonNames.has(name)) return true;
+  const words = name.split(/\s+/).filter(Boolean);
+  return words.length > 0 && words.every((word) => publicHeaderPersonNames.has(word));
+}
+
 function publicPersonStatus(recordType, status) {
   if (recordType === "hospitalized_person") return "Hospitalizado";
   if (looksLikeMedicalText(status)) return "Informacion protegida";
@@ -159,6 +193,7 @@ async function approvedImportedRecords(recordTypes, take = 500) {
         verificationStatus: record.verificationStatus,
         };
         const safePublicRecord = normalizeImportedPersonPublicFields(publicRecord, record.recordType);
+        if (familySearchTypes.includes(record.recordType) && isHeaderPersonRecord(safePublicRecord)) return null;
         return stripInternalPublicFields(operationalResourceTypes.has(record.recordType)
           ? withOperationalClassification(safePublicRecord, record.recordType)
           : safePublicRecord);

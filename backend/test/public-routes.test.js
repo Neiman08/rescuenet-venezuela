@@ -737,3 +737,48 @@ test("public hospitalized endpoint returns publicSafe without private hospital d
     prisma.importedHumanitarianRecord.findMany = originals.imported;
   }
 });
+
+test("public hospitalized endpoint filters imported header rows", async () => {
+  const originals = {
+    admissions: prisma.hospitalAdmission.findMany,
+    imported: prisma.importedHumanitarianRecord.findMany,
+  };
+  prisma.hospitalAdmission.findMany = async () => [];
+  prisma.importedHumanitarianRecord.findMany = async () => [
+    {
+      id: "header-1",
+      recordType: "hospitalized_person",
+      fullName: "Nombre",
+      zone: "Apellido / Segundo Nombre",
+      verificationStatus: "APROBADO",
+      publicSafe: { fullName: "Nombre", status: "Hospitalizado", zone: "Apellido / Segundo Nombre" },
+    },
+    {
+      id: "header-2",
+      recordType: "hospitalized_person",
+      fullName: "Edad Actualizada",
+      verificationStatus: "APROBADO",
+      publicSafe: { fullName: "Edad Actualizada", status: "Hospitalizado", zone: "Edad" },
+    },
+    {
+      id: "valid-1",
+      recordType: "hospitalized_person",
+      fullName: "Rafael Gonzalez",
+      verificationStatus: "APROBADO",
+      publicSafe: { fullName: "Rafael Gonzalez", status: "Hospitalizado", zone: "Libertador Distrito Capital" },
+    },
+  ];
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/hospitalized/public" });
+    assert.equal(response.statusCode, 200);
+    const body = response._getJSONData();
+    assert.equal(body.data.length, 1);
+    assert.equal(body.data[0].fullName, "Rafael Gonzalez");
+    assert.equal(JSON.stringify(body).includes("Apellido / Segundo Nombre"), false);
+    assert.equal(JSON.stringify(body).includes("Edad Actualizada"), false);
+  } finally {
+    prisma.hospitalAdmission.findMany = originals.admissions;
+    prisma.importedHumanitarianRecord.findMany = originals.imported;
+  }
+});
