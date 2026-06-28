@@ -861,7 +861,7 @@ export const publicController = {
     const municipality = containsFilter(req.query.municipality);
     const hospital = containsFilter(req.query.hospital);
     const status = containsFilter(req.query.status);
-    const documentQuery = req.query.documentNumber || req.query.cedula;
+    const documentQuery = req.query.documentNumber || req.query.cedula || req.query.documentId || req.query.passport;
     const take = Math.min(Number(req.query.take) || 100, 200);
 
     const zoneFilter = affectedZoneFilter(state, municipality);

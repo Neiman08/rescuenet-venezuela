@@ -686,6 +686,89 @@ test("public family search can match cedula privately without exposing sensitive
   }
 });
 
+test("public family search matches by documentId param without exposing sensitive fields", async () => {
+  const originals = {
+    missing: prisma.missingPersonReport.findMany,
+    safe: prisma.safeReport.findMany,
+    rescued: prisma.rescuedPerson.findMany,
+    admissions: prisma.hospitalAdmission.findMany,
+    imported: prisma.importedHumanitarianRecord.findMany,
+  };
+  prisma.missingPersonReport.findMany = async () => { throw new Error("documentId search should not scan public missing reports"); };
+  prisma.safeReport.findMany = async () => { throw new Error("documentId search should not scan safe reports"); };
+  prisma.rescuedPerson.findMany = async () => { throw new Error("documentId search should not scan rescued reports"); };
+  prisma.hospitalAdmission.findMany = async () => { throw new Error("documentId search should not scan admissions"); };
+  prisma.importedHumanitarianRecord.findMany = async () => [{
+    id: "imported-docid-1",
+    recordType: "missing_person",
+    documentPrivate: { cedula: "V-99887766" },
+    rawPayload: { cedula: "V-99887766", telefono: "0414-9988776" },
+    privacyLevel: "standard",
+    verificationStatus: "APROBADO",
+    publicSafe: { fullName: "Persona Encontrada", approximateAge: "25", status: "desaparecida", zone: "Miranda" },
+    updatedAt: new Date(),
+  }];
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/family-search/public?documentId=99887766" });
+    assert.equal(response.statusCode, 200);
+    const body = response._getJSONData();
+    assert.equal(body.data.length, 1);
+    assert.equal(body.data[0].name, "Persona Encontrada");
+    assert.equal(JSON.stringify(body).includes("99887766"), false);
+    assert.equal(JSON.stringify(body).includes("0414"), false);
+    assert.equal(JSON.stringify(body).includes("rawPayload"), false);
+  } finally {
+    prisma.missingPersonReport.findMany = originals.missing;
+    prisma.safeReport.findMany = originals.safe;
+    prisma.rescuedPerson.findMany = originals.rescued;
+    prisma.hospitalAdmission.findMany = originals.admissions;
+    prisma.importedHumanitarianRecord.findMany = originals.imported;
+  }
+});
+
+test("public family search matches by passport param without exposing sensitive fields", async () => {
+  const originals = {
+    missing: prisma.missingPersonReport.findMany,
+    safe: prisma.safeReport.findMany,
+    rescued: prisma.rescuedPerson.findMany,
+    admissions: prisma.hospitalAdmission.findMany,
+    imported: prisma.importedHumanitarianRecord.findMany,
+  };
+  prisma.missingPersonReport.findMany = async () => { throw new Error("passport search should not scan public missing reports"); };
+  prisma.safeReport.findMany = async () => { throw new Error("passport search should not scan safe reports"); };
+  prisma.rescuedPerson.findMany = async () => { throw new Error("passport search should not scan rescued reports"); };
+  prisma.hospitalAdmission.findMany = async () => { throw new Error("passport search should not scan admissions"); };
+  prisma.importedHumanitarianRecord.findMany = async () => [{
+    id: "imported-travel-doc-1",
+    recordType: "safe_person",
+    documentPrivate: { passport: "C12345678", telefono: "0212-5556677" },
+    rawPayload: { passport: "C12345678", telefono: "0212-5556677" },
+    privacyLevel: "standard",
+    verificationStatus: "APROBADO",
+    publicSafe: { fullName: "Ciudadano A Salvo", approximateAge: "40", status: "a salvo", zone: "Caracas" },
+    updatedAt: new Date(),
+  }];
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/family-search/public?passport=12345678" });
+    assert.equal(response.statusCode, 200);
+    const body = response._getJSONData();
+    assert.equal(body.data.length, 1);
+    assert.equal(body.data[0].name, "Ciudadano A Salvo");
+    assert.equal(JSON.stringify(body).includes("12345678"), false);
+    assert.equal(JSON.stringify(body).includes("0212"), false);
+    assert.equal(JSON.stringify(body).includes("passport"), false);
+    assert.equal(JSON.stringify(body).includes("rawPayload"), false);
+  } finally {
+    prisma.missingPersonReport.findMany = originals.missing;
+    prisma.safeReport.findMany = originals.safe;
+    prisma.rescuedPerson.findMany = originals.rescued;
+    prisma.hospitalAdmission.findMany = originals.admissions;
+    prisma.importedHumanitarianRecord.findMany = originals.imported;
+  }
+});
+
 test("public hospitalized endpoint returns publicSafe without private hospital details", async () => {
   const originals = {
     admissions: prisma.hospitalAdmission.findMany,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { Building2, CheckCircle, MessageCircle, ShieldCheck, Siren, Users } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Building2, CheckCircle, MessageCircle, Search, ShieldCheck, Siren, Users } from "lucide-react";
 import ActionCard from "../components/ActionCard";
 import StatCard from "../components/StatCard";
 import MapPreview from "../components/MapPreview";
@@ -9,11 +9,20 @@ import { noApprovedDataMessage, noRealDataMessage } from "../config/demoData";
 import { publicApi } from "../lib/api";
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [dashboardStats, setDashboardStats] = useState({});
   const [mapData, setMapData] = useState({ zones: [], reports: [] });
   const [helpCenters, setHelpCenters] = useState([]);
   const [urgentNeeds, setUrgentNeeds] = useState([]);
   const [status, setStatus] = useState("loading");
+  const [familyQuery, setFamilyQuery] = useState("");
+
+  function handleFamilySearch(e) {
+    e.preventDefault();
+    const value = familyQuery.trim();
+    if (value) navigate(`/personas?q=${encodeURIComponent(value)}`);
+    else navigate("/personas");
+  }
 
   useEffect(() => {
     Promise.allSettled([publicApi.getDashboard(), publicApi.getMap(), publicApi.getHelpCenters()])
@@ -79,6 +88,29 @@ export default function Dashboard() {
             <Link to="/donaciones" className="btn bg-green-600 text-white block text-center">Donar con auditoria</Link>
           </div>
         </div>
+      </section>
+
+      {/* ── Buscador familiar ─────────────────────────────────────────────── */}
+      <section className="card p-5">
+        <h2 className="font-black text-lg mb-1">¿Buscas a un familiar?</h2>
+        <p className="text-sm text-slate-500 mb-4">
+          Verifica si una persona está registrada como desaparecida, hospitalizada, rescatada o a salvo.
+        </p>
+        <form onSubmit={handleFamilySearch} className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-2.5">
+            <Search size={16} className="text-slate-400 shrink-0" />
+            <input
+              className="bg-transparent outline-none text-sm w-full placeholder:text-slate-400"
+              value={familyQuery}
+              onChange={(e) => setFamilyQuery(e.target.value)}
+              placeholder="Nombre, apellido, cédula o pasaporte"
+              autoComplete="off"
+            />
+          </div>
+          <button type="submit" className="btn bg-navy text-white flex items-center justify-center gap-2">
+            <Search size={16} /> Buscar persona
+          </button>
+        </form>
       </section>
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
