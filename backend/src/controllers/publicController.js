@@ -78,6 +78,8 @@ function stripInternalPublicFields(record) {
   delete safeRecord.sourceUrl;
   delete safeRecord.sourceRecordId;
   delete safeRecord.possibleDuplicate;
+  delete safeRecord.building;
+  delete safeRecord.capturedAt;
   return safeRecord;
 }
 
