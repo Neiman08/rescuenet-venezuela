@@ -112,7 +112,11 @@ const validPublicStates = new Set([
 ]);
 
 function looksLikeMedicalText(value) {
-  return /politraumat|trauma|fractur|quemadur|herid|lesion|lesión|diagnost|dolor|sangr|uci|grave|critico|crítico|estable|shock|contus|hematoma|paro|insuficiencia|neumon|diabet|hipertensi|embaraz|fallecid|muert|cadaver|cadáver/i.test(String(value || ""));
+  return /politraumat|trauma|fractur|quemadur|herid|lesion|lesión|diagnost|dolor|sangr|uci|grave|critico|crítico|estable|shock|contus|hematoma|paro|insuficiencia|neumon|diabet|hipertensi|embaraz|fallecid|muert|cadaver|cadáver|triaje|triage|medicina interna|emergencia medica|sala de/i.test(String(value || ""));
+}
+
+function looksLikeAgeField(value) {
+  return /^\(?(edad|age|años)\b/i.test(String(value || "").trim());
 }
 
 function normalizePublicText(value) {
@@ -161,11 +165,14 @@ function repairLegacyGoogleDriveHospitalizedPublicRecord(record, sourceName) {
   if (record.recordType !== "hospitalized_person" || !/google drive hospitales/i.test(sourceName || "")) return record;
   const fullName = String(record.fullName || record.name || "").trim();
   const misplacedSurname = String(record.zone || "").trim();
-  if (fullName.split(/\s+/).filter(Boolean).length === 1 && looksLikeMisplacedSurname(misplacedSurname)) {
+  const nameParts = fullName.split(/\s+/).filter(Boolean);
+  const endsWithPreposition = /\b(de|del|de la|de las|de los|y)$/i.test(fullName);
+  if ((nameParts.length === 1 || endsWithPreposition) && looksLikeMisplacedSurname(misplacedSurname)) {
+    const repairedName = `${fullName} ${misplacedSurname}`;
     return {
       ...record,
-      fullName: `${fullName} ${misplacedSurname}`,
-      name: `${fullName} ${misplacedSurname}`,
+      fullName: repairedName,
+      name: repairedName,
       zone: "Zona general protegida",
       currentPlace: record.currentPlace === misplacedSurname ? "Zona general protegida" : record.currentPlace,
       lastSeenPlace: record.lastSeenPlace === misplacedSurname ? "Zona general protegida" : record.lastSeenPlace,
@@ -187,6 +194,12 @@ function normalizeImportedPersonPublicFields(publicRecord, recordType) {
     if (safeRecord.patientStatus) safeRecord.patientStatus = publicPersonStatus(recordType, safeRecord.patientStatus);
     if (safeRecord.state && (!validPublicStates.has(String(safeRecord.state).trim().toLowerCase()) || looksLikeMedicalText(safeRecord.state))) {
       delete safeRecord.state;
+    }
+    if (safeRecord.zone && (looksLikeMedicalText(safeRecord.zone) || looksLikeAgeField(safeRecord.zone))) {
+      safeRecord.zone = "Zona general protegida";
+    }
+    if (safeRecord.currentPlace && (looksLikeMedicalText(safeRecord.currentPlace) || looksLikeAgeField(safeRecord.currentPlace))) {
+      delete safeRecord.currentPlace;
     }
     delete safeRecord.condition;
     delete safeRecord.diagnosis;

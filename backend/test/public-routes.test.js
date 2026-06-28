@@ -783,6 +783,70 @@ test("public hospitalized endpoint filters imported header rows", async () => {
   }
 });
 
+test("public hospitalized endpoint replaces medical text and age fields in zone with protected zone", async () => {
+  const originals = {
+    admissions: prisma.hospitalAdmission.findMany,
+    imported: prisma.importedHumanitarianRecord.findMany,
+  };
+  prisma.hospitalAdmission.findMany = async () => [];
+  prisma.importedHumanitarianRecord.findMany = async () => [
+    {
+      id: "zone-trauma-1",
+      sourceName: "SISMO 2026 VZLA - Google Drive Hospitales",
+      recordType: "hospitalized_person",
+      fullName: "Carina Cabrera",
+      zone: "Trauma",
+      verificationStatus: "APROBADO",
+      publicSafe: { fullName: "Carina Cabrera", status: "Hospitalizado", zone: "Trauma" },
+    },
+    {
+      id: "zone-age-1",
+      sourceName: "SISMO 2026 VZLA - Google Drive Hospitales",
+      recordType: "hospitalized_person",
+      fullName: "Romero Jose",
+      zone: "(Edad ilegible)",
+      verificationStatus: "APROBADO",
+      publicSafe: { fullName: "Romero Jose", status: "Hospitalizado", zone: "(Edad ilegible)" },
+    },
+    {
+      id: "compound-name-1",
+      sourceName: "SISMO 2026 VZLA - Google Drive Hospitales",
+      recordType: "hospitalized_person",
+      fullName: "Lucy de",
+      zone: "Castillo",
+      verificationStatus: "APROBADO",
+      publicSafe: {
+        fullName: "Lucy de",
+        status: "Hospitalizado",
+        zone: "Castillo",
+        sourceName: "SISMO 2026 VZLA - Google Drive Hospitales",
+      },
+    },
+  ];
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/hospitalized/public" });
+    assert.equal(response.statusCode, 200);
+    const body = response._getJSONData();
+    assert.equal(body.data.length, 3);
+
+    const traumaRecord = body.data.find((record) => record.fullName === "Carina Cabrera");
+    assert.equal(traumaRecord.zone, "Zona general protegida");
+    assert.equal(JSON.stringify(traumaRecord).includes("Trauma"), false);
+
+    const ageRecord = body.data.find((record) => record.fullName === "Romero Jose");
+    assert.equal(ageRecord.zone, "Zona general protegida");
+    assert.equal(JSON.stringify(ageRecord).includes("Edad ilegible"), false);
+
+    const compoundRecord = body.data.find((record) => record.fullName === "Lucy de Castillo");
+    assert.ok(compoundRecord, "Compound name Lucy de Castillo should be repaired");
+    assert.equal(compoundRecord.zone, "Zona general protegida");
+  } finally {
+    prisma.hospitalAdmission.findMany = originals.admissions;
+    prisma.importedHumanitarianRecord.findMany = originals.imported;
+  }
+});
+
 test("public rescued endpoint returns empty data when db has no records — no demo data", async () => {
   const originalRescued = prisma.rescuedPerson.findMany;
   const originalImported = prisma.importedHumanitarianRecord.findMany;
