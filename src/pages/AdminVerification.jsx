@@ -34,6 +34,8 @@ export default function AdminVerification() {
         {tasks.map((task) => (
           task === "Revisar ingesta institucional"
             ? <Link key={task} to="/admin/ingesta" className="card p-4 text-left font-bold hover:border-blue-300">{task}</Link>
+            : task === "Verificar reportes"
+            ? <Link key={task} to="/admin/reportes" className="card p-4 text-left font-bold hover:border-blue-300">{task}</Link>
             : <button key={task} className="card p-4 text-left font-bold hover:border-blue-300">{task}</button>
         ))}
       </div>

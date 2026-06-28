@@ -1088,3 +1088,70 @@ test("organizations/public is accessible with a valid token", async () => {
     prisma.user.findFirst = origUser;
   }
 });
+
+test("POST /hospitalized/report creates pending record with no private data in response", async () => {
+  const origZone = prisma.affectedZone.findFirst;
+  const origCreate = prisma.importedHumanitarianRecord.create;
+  prisma.affectedZone.findFirst = async () => ({ id: "z1", state: "Miranda", municipality: "Sucre", deletedAt: null });
+  prisma.importedHumanitarianRecord.create = async (args) => ({
+    id: "pub-hosp-1",
+    recordType: args.data.recordType,
+    verificationStatus: "NO_VERIFICADO",
+    publicSafe: args.data.publicSafe,
+  });
+  try {
+    const response = await dispatch(createApp(), {
+      method: "POST",
+      url: "/api/hospitalized/report",
+      body: { affectedZoneId: "z1", fullName: "Paciente Test", publicLocation: "Los Teques" },
+      headers: { "Content-Type": "application/json" },
+    });
+    assert.equal(response.statusCode, 201);
+    const body = response._getJSONData();
+    assert.equal(body.data.id, "pub-hosp-1");
+    assert.equal(body.data.status, "pending_review");
+    assert.equal(body.data.rawPayload, undefined);
+    assert.equal(body.data.medicalPrivate, undefined);
+    assert.equal(JSON.stringify(body).includes("rawPayload"), false);
+    assert.equal(JSON.stringify(body).includes("medicalPrivate"), false);
+  } finally {
+    prisma.affectedZone.findFirst = origZone;
+    prisma.importedHumanitarianRecord.create = origCreate;
+  }
+});
+
+test("POST /deceased/report creates restricted pending record with no private data in response", async () => {
+  const origZone = prisma.affectedZone.findFirst;
+  const origCreate = prisma.importedHumanitarianRecord.create;
+  prisma.affectedZone.findFirst = async () => ({ id: "z1", state: "Miranda", municipality: "Sucre", deletedAt: null });
+  prisma.importedHumanitarianRecord.create = async (args) => ({
+    id: "pub-dcd-1",
+    recordType: args.data.recordType,
+    verificationStatus: "NO_VERIFICADO",
+    privacyLevel: args.data.privacyLevel,
+    publicSafe: args.data.publicSafe,
+  });
+  try {
+    const response = await dispatch(createApp(), {
+      method: "POST",
+      url: "/api/deceased/report",
+      body: { affectedZoneId: "z1", fullName: "Persona Fallecida", publicLocation: "Guarenas" },
+      headers: { "Content-Type": "application/json" },
+    });
+    assert.equal(response.statusCode, 201);
+    const body = response._getJSONData();
+    assert.equal(body.data.id, "pub-dcd-1");
+    assert.equal(body.data.status, "pending_review");
+    assert.equal(JSON.stringify(body).includes("rawPayload"), false);
+    assert.equal(JSON.stringify(body).includes("medicalPrivate"), false);
+    assert.equal(JSON.stringify(body).includes("contactPrivate"), false);
+  } finally {
+    prisma.affectedZone.findFirst = origZone;
+    prisma.importedHumanitarianRecord.create = origCreate;
+  }
+});
+
+test("GET /admin/citizen-reports requires authentication", async () => {
+  const response = await dispatch(createApp(), { url: "/api/admin/citizen-reports" });
+  assert.equal(response.statusCode, 401);
+});

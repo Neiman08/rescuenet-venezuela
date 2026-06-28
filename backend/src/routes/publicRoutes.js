@@ -14,6 +14,8 @@ router.post("/missing", publicSubmissionRateLimit, antiSpam, validate(publicSche
 router.get("/missing/public", publicController.listPublicMissing);
 router.get("/rescued/public", publicController.listPublicRescued);
 router.post("/rescued/report", publicSubmissionRateLimit, antiSpam, validate(publicSchemas.rescuedReport), publicController.createRescuedReport);
+router.post("/hospitalized/report", publicSubmissionRateLimit, antiSpam, validate(publicSchemas.hospitalizedReport), publicController.createHospitalizedReport);
+router.post("/deceased/report", publicSubmissionRateLimit, antiSpam, validate(publicSchemas.deceasedReport), publicController.createDeceasedReport);
 router.get("/hospitalized/public", publicController.listPublicHospitalized);
 router.get("/hospitals/public", publicController.listPublicHospitals);
 router.get("/shelters/public", publicController.listPublicShelters);

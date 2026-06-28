@@ -252,7 +252,7 @@ async function approvedImportedRecords(recordTypes, take = 500) {
 }
 
 const publicCenterTypes = ["collection_center", "shelter", "hospital", "help_center", "water_point", "food_point", "medical_point", "volunteer_center", "pet_aid_center", "logistics_center", "donation_need"];
-const familySearchTypes = ["missing_person", "hospitalized_person", "trapped_person", "safe_person", "rescued_person"];
+const familySearchTypes = ["missing_person", "hospitalized_person", "trapped_person", "safe_person", "rescued_person", "deceased_person"];
 const operationalResourceTypes = new Set([...publicCenterTypes, "hospital"]);
 const centerTypes = new Set(["hospital", "shelter", "collection_center", "medical_point", "water_point", "food_point", "pet_aid_center", "logistics_center", "help_center"]);
 const logisticsTypes = new Set(["water", "food", "medicine", "fuel", "transport", "generator", "mattress", "medical_supply"]);
@@ -419,6 +419,30 @@ export const publicSchemas = {
       priority: z.string().default("PENDIENTE"),
       notes: z.string().optional(),
       contactPrivate: z.string().optional(),
+      website: z.string().optional(),
+      url: z.string().optional(),
+    }),
+  }),
+  hospitalizedReport: z.object({
+    body: z.object({
+      affectedZoneId: z.string().min(1),
+      fullName: z.string().min(2),
+      approximateAge: z.string().optional(),
+      sex: z.string().optional(),
+      hospitalName: z.string().optional(),
+      publicLocation: z.string().min(2),
+      website: z.string().optional(),
+      url: z.string().optional(),
+    }),
+  }),
+  deceasedReport: z.object({
+    body: z.object({
+      affectedZoneId: z.string().min(1),
+      fullName: z.string().min(2),
+      approximateAge: z.string().optional(),
+      sex: z.string().optional(),
+      publicLocation: z.string().min(2),
+      sourceReference: z.string().optional(),
       website: z.string().optional(),
       url: z.string().optional(),
     }),
@@ -1025,5 +1049,103 @@ export const publicController = {
     ].slice(0, take);
 
     res.json({ data: results, meta: { total: results.length } });
+  }),
+
+  createHospitalizedReport: asyncHandler(async (req, res) => {
+    const body = withoutAntiSpamFields(req.validated.body);
+    const zone = await ensureActiveAffectedZone(body.affectedZoneId);
+    const record = await prisma.importedHumanitarianRecord.create({
+      data: {
+        sourceName: "Reporte publico ciudadano",
+        sourceUrl: "public_web_form",
+        capturedAt: new Date(),
+        sourceRecordId: makeCode("HSP-PUBLIC"),
+        recordType: "hospitalized_person",
+        fullName: body.fullName,
+        approximateAge: body.approximateAge,
+        gender: body.sex,
+        state: zone.state,
+        municipality: zone.municipality,
+        zone: body.publicLocation,
+        publicLocation: body.publicLocation,
+        currentPlace: body.publicLocation,
+        verificationStatus: "NO_VERIFICADO",
+        privacyLevel: "standard",
+        confidenceScore: 15,
+        confidenceLevel: "low",
+        confidenceFactors: ["public_submission", "requires_institutional_review"],
+        publicSafe: compactObject({
+          recordType: "hospitalized_person",
+          fullName: body.fullName,
+          approximateAge: body.approximateAge,
+          gender: body.sex,
+          hospitalName: body.hospitalName,
+          status: "Pendiente de revision",
+          zone: body.publicLocation,
+          currentPlace: body.publicLocation,
+          sourceName: "Reporte publico ciudadano",
+        }),
+        rawPayload: compactObject({
+          ...body,
+          reporterIp: req.ip,
+          userAgent: req.get("user-agent"),
+        }),
+      },
+    });
+    await AuditService.record({
+      action: "public_submission",
+      module: "hospitalized",
+      result: "SUCCESS",
+      ip: req.ip,
+      metadata: { id: record.id, recordType: "hospitalized_person", captcha: req.captcha },
+    });
+    res.status(201).json({ data: { id: record.id, status: "pending_review" } });
+  }),
+
+  createDeceasedReport: asyncHandler(async (req, res) => {
+    const body = withoutAntiSpamFields(req.validated.body);
+    const zone = await ensureActiveAffectedZone(body.affectedZoneId);
+    const record = await prisma.importedHumanitarianRecord.create({
+      data: {
+        sourceName: body.sourceReference || "Reporte publico ciudadano",
+        sourceUrl: "public_web_form",
+        capturedAt: new Date(),
+        sourceRecordId: makeCode("DCD-PUBLIC"),
+        recordType: "deceased_person",
+        fullName: body.fullName,
+        approximateAge: body.approximateAge,
+        gender: body.sex,
+        state: zone.state,
+        municipality: zone.municipality,
+        zone: body.publicLocation,
+        publicLocation: body.publicLocation,
+        verificationStatus: "NO_VERIFICADO",
+        privacyLevel: "restricted",
+        confidenceScore: 5,
+        confidenceLevel: "low",
+        confidenceFactors: ["public_submission", "requires_official_verification", "sensitive_type"],
+        publicSafe: compactObject({
+          recordType: "deceased_person",
+          approximateAge: body.approximateAge,
+          gender: body.sex,
+          status: "Pendiente verificacion oficial",
+          zone: body.publicLocation,
+          sourceName: body.sourceReference || "Reporte publico ciudadano",
+        }),
+        rawPayload: compactObject({
+          ...body,
+          reporterIp: req.ip,
+          userAgent: req.get("user-agent"),
+        }),
+      },
+    });
+    await AuditService.record({
+      action: "public_submission",
+      module: "deceased",
+      result: "SUCCESS",
+      ip: req.ip,
+      metadata: { id: record.id, recordType: "deceased_person", captcha: req.captcha },
+    });
+    res.status(201).json({ data: { id: record.id, status: "pending_review" } });
   }),
 };

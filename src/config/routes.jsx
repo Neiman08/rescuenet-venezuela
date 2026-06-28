@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import AdminVerification from "../pages/AdminVerification";
 import AIReadiness from "../pages/AIReadiness";
+import CitizenReports from "../pages/CitizenReports";
 import Centers from "../pages/Centers";
 import Dashboard from "../pages/Dashboard";
 import DonationAudit from "../pages/DonationAudit";
@@ -80,6 +81,7 @@ export const appRoutes = [
   { path: "/ia", label: "Arquitectura IA", navLabel: "IA", icon: BrainCircuit, element: <AIReadiness />, priority: "restricted", protected: true, requiredPermission: PERM.SYSTEM_ADMIN },
   { path: "/admin", label: "Administracion", navLabel: "Admin", icon: Settings, element: <AdminVerification />, priority: "restricted", protected: true, requiredPermission: PERM.SYSTEM_ADMIN },
   { path: "/admin/ingesta", label: "Ingesta institucional", element: <InstitutionalIngestionReview />, priority: "restricted", protected: true, requiredPermission: PERM.INGESTION },
+  { path: "/admin/reportes", label: "Reportes ciudadanos", element: <CitizenReports />, priority: "restricted", protected: true, requiredPermission: PERM.SYSTEM_ADMIN },
   { path: "/coincidencias", label: "Coincidencias", element: <MatchResults />, priority: "restricted", protected: true },
   { path: "/registrar-rescatado", label: "Registrar rescatado", element: <RegisterRescued />, priority: "restricted", protected: true, requiredPermission: PERM.RESCUED_WRITE },
   { path: "/ubicacion-rescate", label: "Ubicacion de rescate", element: <RescueLocation />, priority: "restricted", protected: true, requiredPermission: PERM.EXACT_LOCATION },

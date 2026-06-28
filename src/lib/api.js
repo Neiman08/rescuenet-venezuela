@@ -43,6 +43,8 @@ export const publicApi = {
   createSafeReport: (body) => request("/safe", { method: "POST", body: JSON.stringify(body) }),
   createMissingReport: (body) => request("/missing", { method: "POST", body: JSON.stringify(body) }),
   createRescuedReport: (body) => request("/rescued/report", { method: "POST", body: JSON.stringify(body) }),
+  createHospitalizedReport: (body) => request("/hospitalized/report", { method: "POST", body: JSON.stringify(body) }),
+  createDeceasedReport: (body) => request("/deceased/report", { method: "POST", body: JSON.stringify(body) }),
   createHelpCenter: (body) => request("/help-centers", { method: "POST", body: JSON.stringify(body) }),
   createLogisticsRequest: (body) => request("/logistics/public", { method: "POST", body: JSON.stringify(body) }),
   getEmergencies: () => request("/emergency/public"),
@@ -78,6 +80,10 @@ export const institutionalApi = {
   rejectIngestionRecord: (id) => request(`/ingestion/records/${id}/reject`, { method: "POST" }),
   setIngestionRecordStatus: (id, verificationStatus) => request(`/ingestion/records/${id}/status`, { method: "PATCH", body: JSON.stringify({ verificationStatus }) }),
   markDuplicate: (id) => request(`/ingestion/records/${id}/mark-duplicate`, { method: "POST" }),
+  getCitizenReports: () => request("/admin/citizen-reports"),
+  reviewMissingReport: (id, body) => request(`/admin/citizen-reports/missing/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  reviewEmergencyReport: (id, body) => request(`/admin/citizen-reports/emergency/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  reviewImportedReport: (id, body) => request(`/admin/citizen-reports/imported/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
 };
 
 export function friendlyApiError(error) {
