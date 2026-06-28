@@ -783,6 +783,26 @@ test("public hospitalized endpoint filters imported header rows", async () => {
   }
 });
 
+test("public rescued endpoint returns empty data when db has no records — no demo data", async () => {
+  const originalRescued = prisma.rescuedPerson.findMany;
+  const originalImported = prisma.importedHumanitarianRecord.findMany;
+  prisma.rescuedPerson.findMany = async () => [];
+  prisma.importedHumanitarianRecord.findMany = async () => [];
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/rescued/public" });
+    assert.equal(response.statusCode, 200);
+    const body = response._getJSONData();
+    assert.equal(body.data.length, 0);
+    assert.equal(JSON.stringify(body).includes("No identificado"), false);
+    assert.equal(JSON.stringify(body).includes("Maria Gonzalez"), false);
+    assert.equal(JSON.stringify(body).includes("Hombre no identificado"), false);
+  } finally {
+    prisma.rescuedPerson.findMany = originalRescued;
+    prisma.importedHumanitarianRecord.findMany = originalImported;
+  }
+});
+
 test("public hospitalized endpoint repairs legacy google drive split surnames", async () => {
   const originals = {
     admissions: prisma.hospitalAdmission.findMany,

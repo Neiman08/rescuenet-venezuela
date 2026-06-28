@@ -30,11 +30,11 @@ import LiveMap from "../pages/LiveMap";
 import Login from "../pages/Login";
 import MatchResults from "../pages/MatchResults";
 import PersonDetail from "../pages/PersonDetail";
+import PersonasPage from "../pages/PersonasPage";
 import PublishMissing from "../pages/PublishMissing";
 import RegisterRescued from "../pages/RegisterRescued";
 import ReportEmergency from "../pages/ReportEmergency";
 import RescueLocation from "../pages/RescueLocation";
-import RescuedList from "../pages/RescuedList";
 import RescuersPanel from "../pages/RescuersPanel";
 import SafeReport from "../pages/SafeReport";
 import SearchFamily from "../pages/SearchFamily";
@@ -52,7 +52,7 @@ export const appRoutes = [
   { path: "/publicar-busqueda", label: "Publicar busqueda", element: <PublishMissing />, permission: permissions.SEARCH_FAMILY, priority: "public" },
   { path: "/registrar-rescatado", label: "Registrar rescatado", element: <RegisterRescued />, permission: permissions.MANAGE_RESCUED, priority: "restricted" },
   { path: "/ubicacion-rescate", label: "Ubicacion de rescate", element: <RescueLocation />, permission: permissions.VIEW_EXACT_LOCATION, priority: "restricted" },
-  { path: "/personas", label: "Personas rescatadas", navLabel: "Personas", icon: Users, element: <RescuedList />, permission: permissions.VIEW_RESCUED_PUBLIC, priority: "operational" },
+  { path: "/personas", label: "Personas", navLabel: "Personas", icon: Users, element: <PersonasPage />, permission: permissions.VIEW_RESCUED_PUBLIC, priority: "operational" },
   { path: "/personas/:id", label: "Detalle de persona", element: <PersonDetail />, permission: permissions.VIEW_RESCUED_PUBLIC, priority: "sensitive" },
   { path: "/coincidencias", label: "Coincidencias", element: <MatchResults />, permission: permissions.SEARCH_FAMILY, priority: "sensitive" },
   { path: "/centros", label: "Centros", navLabel: "Centros", icon: Building2, element: <Centers />, permission: permissions.MANAGE_CENTERS, priority: "operational" },

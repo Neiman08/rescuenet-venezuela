@@ -31,9 +31,8 @@ export default function SearchFamily() {
           id: item.id,
           name: item.name,
           age: item.age,
+          sex: item.sex,
           publicLocation: item.publicLocation,
-          status: item.status,
-          privacy: item.privacyLevel === "restricted" ? "Informacion protegida" : "Resumen publico",
           type: labelForPersonType(item.type),
           hospital: item.hospital || "No indicado",
           source: item.source || "RescueNet",
@@ -85,8 +84,9 @@ export default function SearchFamily() {
           { key: "name", label: "Persona", align: "left", wrap: true },
           { key: "type", label: "Tipo" },
           { key: "age", label: "Edad", hideOnMobile: true },
+          { key: "sex", label: "Sexo", hideOnMobile: true },
           { key: "publicLocation", label: "Zona publica", wrap: true },
-          { key: "status", label: "Estado", badge: true, hideOnMobile: true },
+          { key: "source", label: "Fuente", hideOnMobile: true },
         ]}
         rows={filteredRows}
       />

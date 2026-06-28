@@ -127,6 +127,7 @@ export default function Centers() {
             <option value="food_point">Alimentos</option>
             <option value="pet_aid_center">Mascotas</option>
             <option value="logistics_center">Logistica</option>
+            <option value="help_center">Centro de ayuda</option>
           </select>
           <input className="input" name="name" value={form.name} onChange={updateForm} placeholder="Nombre" required />
           <input className="input" name="organization" value={form.organization} onChange={updateForm} placeholder="Organizacion" />
