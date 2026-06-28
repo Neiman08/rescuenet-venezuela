@@ -24,6 +24,12 @@ const localCorsOrigins = [
   "http://127.0.0.1:5175",
 ];
 
+const productionCorsOrigins = [
+  "https://rescatevzla.net",
+  "https://www.rescatevzla.net",
+  "https://rescuenet-venezuela.onrender.com",
+];
+
 function parseCorsOrigins(value) {
   return String(value || "")
     .split(",")
@@ -32,4 +38,4 @@ function parseCorsOrigins(value) {
 }
 
 export const env = envSchema.parse(process.env);
-export const corsOrigins = [...new Set([...localCorsOrigins, ...parseCorsOrigins(env.CORS_ORIGIN)])];
+export const corsOrigins = [...new Set([...localCorsOrigins, ...productionCorsOrigins, ...parseCorsOrigins(env.CORS_ORIGIN)])];
