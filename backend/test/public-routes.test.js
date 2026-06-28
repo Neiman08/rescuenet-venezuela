@@ -151,6 +151,55 @@ test("public logistics submission creates pending record without exposing contac
   }
 });
 
+test("public rescued report creates unverified imported record without exposing private fields", async () => {
+  const originalCreate = prisma.importedHumanitarianRecord.create;
+  const originalAuditCreate = prisma.auditLog.create;
+  let createdData;
+  prisma.importedHumanitarianRecord.create = async ({ data }) => {
+    createdData = data;
+    return {
+      id: "rescued-public-1",
+      publicSafe: data.publicSafe,
+    };
+  };
+  prisma.auditLog.create = async () => ({ id: "audit-1" });
+
+  try {
+    const response = await dispatch(createApp(), {
+      method: "POST",
+      url: "/api/rescued/report",
+      body: {
+        name: "Persona Rescatada",
+        approximateAge: "40",
+        sex: "Femenino",
+        state: "Miranda",
+        municipality: "Guaicaipuro",
+        publicLocation: "Los Teques",
+        currentPlace: "Refugio exacto privado",
+        conditionSummary: "Diagnostico privado",
+        observations: "Observacion sensible",
+        reporterName: "Reportante",
+        contactPrivate: "0412-1234567",
+        source: "Brigada local",
+      },
+    });
+    assert.equal(response.statusCode, 201);
+    assert.equal(createdData.recordType, "rescued_person");
+    assert.equal(createdData.verificationStatus, "NO_VERIFICADO");
+    assert.equal(createdData.contactPrivate, "0412-1234567");
+    assert.equal(createdData.medicalPrivate.conditionSummary, "Diagnostico privado");
+    const body = response._getJSONData();
+    assert.equal(body.data.status, "pending_review");
+    assert.equal(JSON.stringify(body).includes("0412"), false);
+    assert.equal(JSON.stringify(body).includes("Diagnostico privado"), false);
+    assert.equal(JSON.stringify(body).includes("Observacion sensible"), false);
+    assert.equal(JSON.stringify(body).includes("rawPayload"), false);
+  } finally {
+    prisma.importedHumanitarianRecord.create = originalCreate;
+    prisma.auditLog.create = originalAuditCreate;
+  }
+});
+
 test("protected emergency route rejects requests without token", async () => {
   const response = await dispatch(createApp(), { url: "/api/emergency" });
   assert.equal(response.statusCode, 401);

@@ -285,6 +285,24 @@ export const publicSchemas = {
       url: z.string().optional(),
     }),
   }),
+  rescuedReport: z.object({
+    body: z.object({
+      name: z.string().min(2),
+      approximateAge: z.string().optional(),
+      sex: z.string().optional(),
+      state: z.string().optional(),
+      municipality: z.string().optional(),
+      publicLocation: z.string().min(2),
+      currentPlace: z.string().optional(),
+      conditionSummary: z.string().optional(),
+      observations: z.string().optional(),
+      reporterName: z.string().optional(),
+      contactPrivate: z.string().optional(),
+      source: z.string().optional(),
+      website: z.string().optional(),
+      url: z.string().optional(),
+    }),
+  }),
   helpCenter: z.object({
     body: z.object({
       recordType: z.enum(["hospital", "shelter", "collection_center", "medical_point", "water_point", "food_point", "pet_aid_center", "logistics_center", "help_center"]),
@@ -435,6 +453,70 @@ export const publicController = {
     });
     const imported = await approvedImportedRecords(["rescued_person"]);
     res.json({ data: [...records.map(PublicDataSanitizer.rescued), ...imported] });
+  }),
+
+  createRescuedReport: asyncHandler(async (req, res) => {
+    const body = withoutAntiSpamFields(req.validated.body);
+    const record = await prisma.importedHumanitarianRecord.create({
+      data: {
+        sourceName: body.source || "Reporte publico RescueNet",
+        sourceUrl: "public_web_form",
+        capturedAt: new Date(),
+        sourceRecordId: makeCode("RSC-PUBLIC"),
+        recordType: "rescued_person",
+        fullName: body.name,
+        approximateAge: body.approximateAge,
+        gender: body.sex,
+        status: "PENDIENTE_REVISION",
+        state: body.state,
+        municipality: body.municipality,
+        zone: body.publicLocation,
+        publicLocation: body.publicLocation,
+        currentPlace: body.publicLocation,
+        description: body.observations,
+        contactPrivate: body.contactPrivate,
+        contactInfoPrivate: body.contactPrivate,
+        medicalPrivate: compactObject({
+          conditionSummary: body.conditionSummary,
+          observations: body.observations,
+        }),
+        locationPrivate: compactObject({
+          currentPlace: body.currentPlace,
+          state: body.state,
+          municipality: body.municipality,
+        }),
+        verificationStatus: "NO_VERIFICADO",
+        privacyLevel: "standard",
+        confidenceScore: 20,
+        confidenceLevel: "low",
+        confidenceFactors: ["public_submission", "requires_institutional_review"],
+        publicSafe: compactObject({
+          recordType: "rescued_person",
+          fullName: body.name,
+          approximateAge: body.approximateAge,
+          gender: body.sex,
+          status: "Pendiente de revision",
+          state: body.state,
+          municipality: body.municipality,
+          zone: body.publicLocation,
+          currentPlace: body.publicLocation,
+          sourceName: body.source || "Reporte publico RescueNet",
+        }),
+        rawPayload: compactObject({
+          ...body,
+          reporterIp: req.ip,
+          userAgent: req.get("user-agent"),
+        }),
+      },
+    });
+    await AuditService.record({
+      action: "public_submission",
+      module: "rescued",
+      result: "SUCCESS",
+      ip: req.ip,
+      metadata: { id: record.id, recordType: "rescued_person", captcha: req.captcha },
+    });
+    res.status(201).json({ data: { id: record.id, status: "pending_review", publicSafe: record.publicSafe } });
   }),
 
   listPublicHospitalized: asyncHandler(async (_req, res) => {

@@ -42,6 +42,7 @@ export const publicApi = {
   createEmergency: (body) => request("/emergency", { method: "POST", body: JSON.stringify(body) }),
   createSafeReport: (body) => request("/safe", { method: "POST", body: JSON.stringify(body) }),
   createMissingReport: (body) => request("/missing", { method: "POST", body: JSON.stringify(body) }),
+  createRescuedReport: (body) => request("/rescued/report", { method: "POST", body: JSON.stringify(body) }),
   createHelpCenter: (body) => request("/help-centers", { method: "POST", body: JSON.stringify(body) }),
   createLogisticsRequest: (body) => request("/logistics/public", { method: "POST", body: JSON.stringify(body) }),
   getEmergencies: () => request("/emergency/public"),

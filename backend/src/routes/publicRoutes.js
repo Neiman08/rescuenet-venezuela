@@ -12,6 +12,7 @@ router.get("/safe/public", publicController.listPublicSafeReports);
 router.post("/missing", publicSubmissionRateLimit, antiSpam, validate(publicSchemas.missing), publicController.createMissingReport);
 router.get("/missing/public", publicController.listPublicMissing);
 router.get("/rescued/public", publicController.listPublicRescued);
+router.post("/rescued/report", publicSubmissionRateLimit, antiSpam, validate(publicSchemas.rescuedReport), publicController.createRescuedReport);
 router.get("/hospitalized/public", publicController.listPublicHospitalized);
 router.get("/hospitals/public", publicController.listPublicHospitals);
 router.get("/shelters/public", publicController.listPublicShelters);

@@ -6,6 +6,7 @@ export const publicRoutes = [
   { method: "POST", path: "/api/missing", purpose: "Public missing person report" },
   { method: "GET", path: "/api/missing/public", purpose: "Public sanitized missing reports" },
   { method: "GET", path: "/api/rescued/public", purpose: "Public sanitized rescued people" },
+  { method: "POST", path: "/api/rescued/report", purpose: "Public rescued person report pending review" },
   { method: "GET", path: "/api/hospitals/public", purpose: "Public hospitals" },
   { method: "GET", path: "/api/shelters/public", purpose: "Public shelters" },
   { method: "GET", path: "/api/map/public", purpose: "Public map" },
