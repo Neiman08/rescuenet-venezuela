@@ -105,38 +105,136 @@ function normalizeHeader(value) {
     .replace(/[^a-z0-9]+/g, "");
 }
 
-function pick(row, keys) {
-  const entries = Object.entries(row || {});
-  for (const key of keys) {
-    const target = normalizeHeader(key);
-    const found = entries.find(([header, value]) => normalizeHeader(header).includes(target) && value !== undefined && value !== null && String(value).trim() !== "");
-    if (found) return found[1];
+function normalizeText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+const headerAliases = {
+  fullName: ["nombreyapellido", "nombresyapellidos", "apellidosynombres", "apellidonombre", "nombrecompleto", "paciente", "fullname"],
+  firstName: ["nombre", "nombres", "primernombre"],
+  lastName: ["apellido", "apellidos", "segundonombre", "apellidosegundonombre", "apellidosegundonombres"],
+  age: ["edad", "edadactualizada", "age"],
+  gender: ["sexo", "genero", "gender"],
+  hospital: ["hospital", "centro", "centromedico", "centrodesalud"],
+  municipality: ["municipio", "municipality"],
+  city: ["ciudad", "city"],
+  state: ["estado", "entidad", "state"],
+  zone: ["zona", "sector", "ubicacion", "ubicacionpublica"],
+  condition: ["condicion", "condition", "diagnostico", "diagnosticoobservacion"],
+  status: ["estatus", "status", "situacion"],
+  cedula: ["cedula", "documento", "documentnumber", "identificacion"],
+  room: ["habitacion", "room"],
+  bed: ["cama", "bed"],
+  floor: ["piso", "floor"],
+  observations: ["observaciones", "observacion", "observations", "nota", "notas"],
+};
+
+const normalizedHeaderTokens = new Set([
+  "nombre",
+  "nombres",
+  "nombre apellido",
+  "nombre y apellido",
+  "nombres y apellidos",
+  "apellido",
+  "apellidos",
+  "segundo nombre",
+  "apellido segundo nombre",
+  "apellido segundo nombres",
+  "apellido nombre",
+  "edad",
+  "edad actualizada",
+  "sexo",
+  "estado",
+  "hospital",
+  "municipio",
+  "ciudad",
+  "observaciones",
+  "observacion",
+  "condicion",
+  "diagnostico",
+  "estatus",
+  "zona",
+  "sector",
+].map(normalizeText));
+
+function isHeaderText(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) return false;
+  if (normalizedHeaderTokens.has(normalized)) return true;
+  const words = normalized.split(/\s+/).filter(Boolean);
+  return words.length > 0 && words.every((word) => normalizedHeaderTokens.has(word));
+}
+
+function meaningful(value) {
+  const text = String(value ?? "").trim();
+  return text && !isHeaderText(text) ? text : undefined;
+}
+
+function headerKeyFor(header) {
+  const normalized = normalizeHeader(header);
+  for (const [field, aliases] of Object.entries(headerAliases)) {
+    if (aliases.includes(normalized)) return field;
   }
   return undefined;
 }
 
+function mapRow(row) {
+  const mapped = {};
+  for (const [header, value] of Object.entries(row || {})) {
+    const field = headerKeyFor(header);
+    const clean = meaningful(value);
+    if (field && clean && !mapped[field]) mapped[field] = clean;
+  }
+  return mapped;
+}
+
+function compactName(...parts) {
+  return parts
+    .map((part) => meaningful(part))
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isEmptyRow(row) {
+  return Object.values(row || {}).every((value) => String(value ?? "").trim() === "");
+}
+
+function duplicateKey(record) {
+  return normalizeText([record.fullName, record.hospitalName, record.approximateAge].filter(Boolean).join("|"));
+}
+
 function recordFromRow(row, file, index) {
-  const fullName = pick(row, ["apellidosynombres", "nombres", "nombre", "paciente", "fullName"]);
-  if (!fullName || String(fullName).trim().length < 3) return null;
+  if (isEmptyRow(row)) return null;
+  const mapped = mapRow(row);
+  const fullName = compactName(mapped.firstName, mapped.lastName) || meaningful(mapped.fullName);
+  if (!fullName || fullName.length < 2 || isHeaderText(fullName)) return null;
+  const publicZone = compactName(mapped.municipality, mapped.city, mapped.state) || "Zona general protegida";
   return {
     id: `${file.id}-${index}`,
     sourceRecordId: `${file.id}-${index}`,
     recordUrl: file.url,
     recordType: "hospitalized_person",
     fullName,
-    approximateAge: pick(row, ["edad", "age"]),
-    gender: pick(row, ["sexo", "gender"]),
-    cedula: pick(row, ["cedula", "documento", "documentNumber"]),
-    hospitalName: pick(row, ["hospital", "centro"]),
-    condition: pick(row, ["condicion", "condition", "diagnostico", "estado"]),
-    status: pick(row, ["estatus", "status", "estado"]) || "Hospitalizado",
-    state: pick(row, ["estado", "state"]),
-    municipality: pick(row, ["municipio", "municipality"]),
-    zone: pick(row, ["zona", "sector", "ubicacion"]),
-    room: pick(row, ["habitacion", "room"]),
-    bed: pick(row, ["cama", "bed"]),
-    floor: pick(row, ["piso", "floor"]),
-    observations: pick(row, ["observaciones", "observations", "nota"]),
+    approximateAge: mapped.age,
+    gender: mapped.gender,
+    cedula: mapped.cedula,
+    hospitalName: mapped.hospital,
+    condition: mapped.condition,
+    status: mapped.status || "Hospitalizado",
+    state: mapped.state,
+    municipality: mapped.municipality,
+    zone: publicZone,
+    room: mapped.room,
+    bed: mapped.bed,
+    floor: mapped.floor,
+    observations: mapped.observations,
     sourceFileName: file.name,
     sourceUrl: file.url,
     rawPayload: row,
@@ -198,8 +296,22 @@ export function parseHospitalAdmissionText(text, file = { id: "text", name: "sou
   return records;
 }
 
-async function parseTabularFile(file, rows) {
-  return rows.map((row, index) => recordFromRow(row, file, index + 1)).filter(Boolean);
+export function parseHospitalAdmissionRows(rows, file = { id: "rows", name: "source", url: undefined }, { maxRecords = DEFAULT_MAX_RECORDS } = {}) {
+  const seen = new Set();
+  const records = [];
+  for (let index = 0; index < rows.length && records.length < maxRecords; index += 1) {
+    const record = recordFromRow(rows[index], file, index + 1);
+    if (!record) continue;
+    const key = duplicateKey(record);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    records.push(record);
+  }
+  return records;
+}
+
+async function parseTabularFile(file, rows, { maxRecords = DEFAULT_MAX_RECORDS } = {}) {
+  return parseHospitalAdmissionRows(rows, file, { maxRecords });
 }
 
 async function parseDriveFile(file, { timeoutMs = DEFAULT_TIMEOUT_MS, maxRecords = DEFAULT_MAX_RECORDS } = {}) {
@@ -211,20 +323,20 @@ async function parseDriveFile(file, { timeoutMs = DEFAULT_TIMEOUT_MS, maxRecords
   }
   if (mime === SHEET_MIME) {
     const rows = parseCsv(await fetchText(sheetExportUrl(file.id, "csv"), { timeoutMs }));
-    return { records: (await parseTabularFile({ ...file, url: sheetExportUrl(file.id, "csv") }, rows)).slice(0, maxRecords), unparseable: [] };
+    return { records: await parseTabularFile({ ...file, url: sheetExportUrl(file.id, "csv") }, rows, { maxRecords }), unparseable: [] };
   }
   if (mime.includes("spreadsheet") || /\.xlsx?$/i.test(file.name)) {
     const rows = await fetchExcel(downloadUrl(file.id));
-    return { records: await parseTabularFile({ ...file, url: downloadUrl(file.id) }, rows), unparseable: [] };
+    return { records: await parseTabularFile({ ...file, url: downloadUrl(file.id) }, rows, { maxRecords }), unparseable: [] };
   }
   if (mime.includes("csv") || /\.csv$/i.test(file.name)) {
     const rows = parseCsv(await fetchText(downloadUrl(file.id), { timeoutMs }));
-    return { records: (await parseTabularFile({ ...file, url: downloadUrl(file.id) }, rows)).slice(0, maxRecords), unparseable: [] };
+    return { records: await parseTabularFile({ ...file, url: downloadUrl(file.id) }, rows, { maxRecords }), unparseable: [] };
   }
   if (mime.includes("json") || /\.json$/i.test(file.name)) {
     const payload = JSON.parse(await fetchText(downloadUrl(file.id), { timeoutMs }));
     const rows = Array.isArray(payload) ? payload : payload.records || payload.data || [];
-    return { records: (await parseTabularFile({ ...file, url: downloadUrl(file.id) }, rows)).slice(0, maxRecords), unparseable: [] };
+    return { records: await parseTabularFile({ ...file, url: downloadUrl(file.id) }, rows, { maxRecords }), unparseable: [] };
   }
   if (mime === PDF_MIME || mime.startsWith(IMAGE_MIME_PREFIX) || /\.(pdf|png|jpe?g|webp)$/i.test(file.name)) {
     return { records: [], unparseable: [{ ...file, reason: "PDF/image detected; OCR is intentionally not performed automatically." }] };
@@ -252,13 +364,20 @@ export async function fetchGoogleDriveHospitalAdmissions(source) {
   const files = (await listDriveFolder(rootUrl, { timeoutMs })).slice(0, maxFiles);
   const records = [];
   const unparseable = [];
+  const seenRecords = new Set();
 
   for (const file of files) {
     if (records.length >= maxRecords) break;
     if (file.mimeType === FOLDER_MIME) continue;
     try {
       const parsed = await parseDriveFile(file, { timeoutMs, maxRecords: maxRecords - records.length });
-      records.push(...parsed.records.slice(0, maxRecords - records.length));
+      for (const record of parsed.records) {
+        const key = duplicateKey(record);
+        if (seenRecords.has(key)) continue;
+        seenRecords.add(key);
+        records.push(record);
+        if (records.length >= maxRecords) break;
+      }
       unparseable.push(...parsed.unparseable);
     } catch (error) {
       unparseable.push({ ...file, reason: error.message });

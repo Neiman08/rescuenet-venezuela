@@ -12,7 +12,7 @@ import { HumanitarianNormalizer } from "../src/ingestion/humanitarianNormalizer.
 import { HumanitarianDeduplicationService } from "../src/ingestion/humanitarianDeduplicationService.js";
 import { IngestionPrivacyService } from "../src/ingestion/ingestionPrivacyService.js";
 import { isImportableHumanitarianRecord, isUsefulRawRecord } from "../src/ingestion/ingestionRecordQuality.js";
-import { extractDriveItems, parseHospitalAdmissionText } from "../src/ingestion/googleDriveHospitalAdmissionsConnector.js";
+import { extractDriveItems, parseHospitalAdmissionRows, parseHospitalAdmissionText } from "../src/ingestion/googleDriveHospitalAdmissionsConnector.js";
 import { approvePublicSafeRecords } from "../src/ingestion/approvePublicSafeRecords.js";
 import { fetchRescateVenezuela } from "../src/ingestion/rescateVenezuelaConnector.js";
 import { parseCliArgs } from "../src/ingestion/runHumanitarianIngestion.js";
@@ -119,6 +119,26 @@ test("Hospitalized records keep clinical/location details private and publicSafe
   assert.equal(JSON.stringify(record.publicSafe).includes("87654321"), false);
   assert.equal(JSON.stringify(record.publicSafe).includes("Diagnostico sensible"), false);
   assert.equal(JSON.stringify(record.publicSafe).includes("402"), false);
+});
+
+test("Google Drive hospital tabular parser skips headers and maps shuffled columns", () => {
+  const rows = [
+    { Nombre: "Nombre", "Apellido / Segundo Nombre": "Apellido / Segundo Nombre", Edad: "Edad", Municipio: "Municipio", Hospital: "Hospital" },
+    { Edad: "34", Hospital: "Hospital Central", Nombre: "Rafael", "Apellido / Segundo Nombre": "González", Municipio: "Libertador", Estado: "Distrito Capital" },
+    { Edad: "41", Hospital: "Hospital Vargas", Nombre: "José", Apellido: "Ramírez", Municipio: "La Guaira", Estado: "La Guaira" },
+    { Edad: "39", Hospital: "Hospital Victorino Santaella", Nombre: "Carla", Apellido: "Cardozo", Municipio: "Guaicaipuro", Estado: "Miranda" },
+    { Edad: "Edad Actualizada", Hospital: "", Nombre: "Edad Actualizada", Apellido: "", Municipio: "", Estado: "" },
+    { Edad: "34", Hospital: "Hospital Central", Nombre: "Rafael", "Apellido / Segundo Nombre": "González", Municipio: "Libertador", Estado: "Distrito Capital" },
+    { Edad: "", Hospital: "", Nombre: "", Apellido: "", Municipio: "", Estado: "" },
+  ];
+
+  const records = parseHospitalAdmissionRows(rows, { id: "sheet-1", name: "Hospitalizados", url: "https://example.org/sheet.csv" });
+
+  assert.equal(records.length, 3);
+  assert.deepEqual(records.map((record) => record.fullName), ["Rafael González", "José Ramírez", "Carla Cardozo"]);
+  assert.equal(records[0].zone, "Libertador Distrito Capital");
+  assert.equal(records[0].zone.includes("González"), false);
+  assert.equal(records.some((record) => ["Nombre", "Edad", "Edad Actualizada"].includes(record.fullName)), false);
 });
 
 test("HumanitarianNormalizer marks deceased records as private-only", () => {
