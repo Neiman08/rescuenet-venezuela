@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import DataTable from "../components/DataTable";
 import SectionTitle from "../components/SectionTitle";
-import { auditLogs } from "../data/mockData";
 import { roleCatalog } from "../data/roles";
 import { permissions, rolePermissions } from "../security/accessControl";
 
@@ -30,7 +29,7 @@ const securityControls = [
 export default function AdminVerification() {
   return (
     <div className="space-y-6">
-      <SectionTitle title="Administracion" subtitle="Centro mock de verificacion, roles, auditoria y control antifraude." />
+      <SectionTitle title="Administracion" subtitle="Centro de verificacion, roles, auditoria y control antifraude." />
       <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-4">
         {tasks.map((task) => (
           task === "Revisar ingesta institucional"
@@ -45,12 +44,12 @@ export default function AdminVerification() {
             {roleCatalog.map((role) => <span key={role.id} className="badge bg-slate-100 text-slate-700">{role.label}</span>)}
           </div>
         </div>
-        <DataTable columns={[
-          { key: "time", label: "Fecha" },
-          { key: "actor", label: "Actor" },
-          { key: "action", label: "Accion" },
-          { key: "level", label: "Riesgo" },
-        ]} rows={auditLogs} />
+        <div className="card p-5">
+          <h2 className="font-black mb-4">Logs de auditoria</h2>
+          <div className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-600">
+            Sin datos reales registrados todavía.
+          </div>
+        </div>
       </div>
       <div className="card p-5">
         <h2 className="font-black mb-4">Matriz de acceso operativo</h2>

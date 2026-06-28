@@ -57,6 +57,7 @@ export const publicApi = {
   getHospitals: () => request("/hospitals/public"),
   getShelters: () => request("/shelters/public"),
   getDonations: () => request("/donations/public"),
+  getOrganizations: () => request("/organizations/public"),
   searchFamily: (params = {}) => {
     const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined && value !== "")).toString();
     return request(`/family-search/public${query ? `?${query}` : ""}`);
