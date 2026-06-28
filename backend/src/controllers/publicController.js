@@ -985,20 +985,36 @@ export const publicController = {
         privacyLevel: "standard",
         createdAt: record.createdAt,
       })),
-      ...imported.filter((record) => recordDocumentMatches(record, documentQuery)).map((record) => familyResult({
+      ...imported.filter((record) => recordDocumentMatches(record, documentQuery)).map((record) => {
+        const repairedPublic = repairLegacyGoogleDriveHospitalizedPublicRecord(
+          normalizeImportedPersonPublicFields(
+            {
+              fullName: record.publicSafe?.fullName || record.fullName,
+              name: record.publicSafe?.name,
+              zone: record.publicSafe?.zone || record.zone,
+              status: record.publicSafe?.status,
+              state: record.publicSafe?.state,
+              recordType: record.recordType,
+            },
+            record.recordType,
+          ),
+          record.sourceName,
+        );
+        return familyResult({
         id: record.id,
         type: record.recordType,
-        name: record.publicSafe?.fullName || record.publicSafe?.name || record.fullName,
+        name: repairedPublic.fullName || repairedPublic.name || record.publicSafe?.fullName || record.fullName,
         age: record.publicSafe?.approximateAge || record.approximateAge,
         sex: record.publicSafe?.gender || record.gender,
-        status: record.publicSafe?.status || record.status,
-        publicLocation: record.publicSafe?.currentPlace || record.publicSafe?.lastSeenPlace || record.publicSafe?.zone || record.zone,
+        status: repairedPublic.status || record.publicSafe?.status || record.status,
+        publicLocation: record.publicSafe?.currentPlace || record.publicSafe?.lastSeenPlace || repairedPublic.zone || record.zone,
         hospital: record.publicSafe?.hospitalName || record.hospitalName,
         source: record.sourceName,
         privacyLevel: record.privacyLevel,
         verificationStatus: record.verificationStatus,
         updatedAt: record.updatedAt,
-      })),
+      });
+      }),
     ].slice(0, take);
 
     res.json({ data: results, meta: { total: results.length } });

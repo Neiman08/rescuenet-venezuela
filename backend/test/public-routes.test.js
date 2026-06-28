@@ -847,6 +847,52 @@ test("public hospitalized endpoint replaces medical text and age fields in zone 
   }
 });
 
+test("family search repairs split surname from google drive hospitales source", async () => {
+  const originals = {
+    missing: prisma.missingPersonReport.findMany,
+    safe: prisma.safeReport.findMany,
+    rescued: prisma.rescuedPerson.findMany,
+    admissions: prisma.hospitalAdmission.findMany,
+    imported: prisma.importedHumanitarianRecord.findMany,
+  };
+  prisma.missingPersonReport.findMany = async () => [];
+  prisma.safeReport.findMany = async () => [];
+  prisma.rescuedPerson.findMany = async () => [];
+  prisma.hospitalAdmission.findMany = async () => [];
+  prisma.importedHumanitarianRecord.findMany = async () => [{
+    id: "nelscy-1",
+    sourceName: "SISMO 2026 VZLA - Google Drive Hospitales",
+    recordType: "hospitalized_person",
+    fullName: "Nelscy",
+    zone: "Fernandez",
+    verificationStatus: "APROBADO",
+    privacyLevel: "standard",
+    publicSafe: {
+      fullName: "Nelscy",
+      status: "Hospitalizado",
+      zone: "Fernandez",
+      sourceName: "SISMO 2026 VZLA - Google Drive Hospitales",
+    },
+    updatedAt: new Date(),
+  }];
+
+  try {
+    const response = await dispatch(createApp(), { url: "/api/family-search/public?q=Nelscy" });
+    assert.equal(response.statusCode, 200);
+    const body = response._getJSONData();
+    assert.equal(body.data.length, 1);
+    assert.equal(body.data[0].name, "Nelscy Fernandez");
+    assert.equal(body.data[0].publicLocation, "Zona general protegida");
+    assert.equal(JSON.stringify(body).includes('"name":"Nelscy"'), false);
+  } finally {
+    prisma.missingPersonReport.findMany = originals.missing;
+    prisma.safeReport.findMany = originals.safe;
+    prisma.rescuedPerson.findMany = originals.rescued;
+    prisma.hospitalAdmission.findMany = originals.admissions;
+    prisma.importedHumanitarianRecord.findMany = originals.imported;
+  }
+});
+
 test("public rescued endpoint returns empty data when db has no records — no demo data", async () => {
   const originalRescued = prisma.rescuedPerson.findMany;
   const originalImported = prisma.importedHumanitarianRecord.findMany;
