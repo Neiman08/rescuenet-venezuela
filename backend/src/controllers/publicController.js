@@ -992,6 +992,8 @@ export const publicController = {
               fullName: record.publicSafe?.fullName || record.fullName,
               name: record.publicSafe?.name,
               zone: record.publicSafe?.zone || record.zone,
+              currentPlace: record.publicSafe?.currentPlace || record.currentPlace,
+              lastSeenPlace: record.publicSafe?.lastSeenPlace || record.lastSeenPlace,
               status: record.publicSafe?.status,
               state: record.publicSafe?.state,
               recordType: record.recordType,
@@ -1001,19 +1003,19 @@ export const publicController = {
           record.sourceName,
         );
         return familyResult({
-        id: record.id,
-        type: record.recordType,
-        name: repairedPublic.fullName || repairedPublic.name || record.publicSafe?.fullName || record.fullName,
-        age: record.publicSafe?.approximateAge || record.approximateAge,
-        sex: record.publicSafe?.gender || record.gender,
-        status: repairedPublic.status || record.publicSafe?.status || record.status,
-        publicLocation: record.publicSafe?.currentPlace || record.publicSafe?.lastSeenPlace || repairedPublic.zone || record.zone,
-        hospital: record.publicSafe?.hospitalName || record.hospitalName,
-        source: record.sourceName,
-        privacyLevel: record.privacyLevel,
-        verificationStatus: record.verificationStatus,
-        updatedAt: record.updatedAt,
-      });
+          id: record.id,
+          type: record.recordType,
+          name: repairedPublic.fullName || repairedPublic.name || record.publicSafe?.fullName || record.fullName,
+          age: record.publicSafe?.approximateAge || record.approximateAge,
+          sex: record.publicSafe?.gender || record.gender,
+          status: repairedPublic.status || record.publicSafe?.status || record.status,
+          publicLocation: repairedPublic.currentPlace || repairedPublic.lastSeenPlace || repairedPublic.zone || record.zone,
+          hospital: record.publicSafe?.hospitalName || record.hospitalName,
+          source: record.sourceName,
+          privacyLevel: record.privacyLevel,
+          verificationStatus: record.verificationStatus,
+          updatedAt: record.updatedAt,
+        });
       }),
     ].slice(0, take);
 
