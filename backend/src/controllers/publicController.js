@@ -297,7 +297,7 @@ function familyResult(base) {
     status: base.status || "Por verificar",
     publicLocation: base.publicLocation || "Zona no indicada",
     hospital: base.hospital,
-    source: base.source || "RescueNet",
+    source: base.source || "RescateVZLA",
     privacyLevel: base.privacyLevel || "standard",
     verificationStatus: base.verificationStatus,
     updatedAt: base.updatedAt || base.createdAt,
@@ -541,7 +541,7 @@ export const publicController = {
     const body = withoutAntiSpamFields(req.validated.body);
     const record = await prisma.importedHumanitarianRecord.create({
       data: {
-        sourceName: body.source || "Reporte publico RescueNet",
+        sourceName: body.source || "Reporte publico RescateVZLA",
         sourceUrl: "public_web_form",
         capturedAt: new Date(),
         sourceRecordId: makeCode("RSC-PUBLIC"),
@@ -582,7 +582,7 @@ export const publicController = {
           municipality: body.municipality,
           zone: body.publicLocation,
           currentPlace: body.publicLocation,
-          sourceName: body.source || "Reporte publico RescueNet",
+          sourceName: body.source || "Reporte publico RescateVZLA",
         }),
         rawPayload: compactObject({
           ...body,

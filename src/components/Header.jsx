@@ -15,7 +15,7 @@ export default function Header() {
           <Search size={18} className="text-slate-400" />
           <input className="bg-transparent outline-none px-2 text-sm w-full" placeholder="Buscar persona, zona, refugio..." />
         </div>
-        <span className="lg:hidden font-black text-navy truncate">RescueNet Venezuela</span>
+        <span className="lg:hidden font-black text-navy truncate">RescateVZLA</span>
       </div>
       <div className="flex items-center gap-3">
         <select className="hidden md:block input py-2 w-56">

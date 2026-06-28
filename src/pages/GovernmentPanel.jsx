@@ -59,15 +59,15 @@ export default function GovernmentPanel() {
         }
       />
 
-      {/* ── Datos internos RescueNet ─────────────────────────────────────── */}
+      {/* ── Datos internos RescateVZLA ──────────────────────────────────── */}
       <section className="space-y-4">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Datos internos RescueNet</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Datos internos RescateVZLA</span>
           <span className="h-px flex-1 bg-slate-200" />
         </div>
         <p className="text-xs text-slate-500 flex gap-1 items-start">
           <Info size={13} className="mt-0.5 shrink-0" />
-          Cifras derivadas de los registros cargados y verificados en la plataforma RescueNet Venezuela. No representan un balance oficial del Gobierno.
+          Cifras derivadas de los registros cargados y verificados en la plataforma RescateVZLA. No representan un balance oficial del Gobierno.
         </p>
 
         {dashStatus === "error" && (
@@ -150,7 +150,7 @@ export default function GovernmentPanel() {
 
         <p className="text-xs text-slate-400 flex gap-1 items-start">
           <Info size={12} className="mt-0.5 shrink-0" />
-          Las zonas reflejan el catalogo operativo de RescueNet. No incluyen descripcion oficial de afectaciones; esa informacion proviene del balance oficial del Gobierno.
+          Las zonas reflejan el catalogo operativo de RescateVZLA. No incluyen descripcion oficial de afectaciones; esa informacion proviene del balance oficial del Gobierno.
         </p>
       </section>
 

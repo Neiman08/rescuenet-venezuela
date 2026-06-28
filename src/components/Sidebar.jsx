@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { HeartHandshake, LogIn, LogOut } from "lucide-react";
+import { LogIn, LogOut } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { navigationRoutes } from "../config/routes";
 
@@ -36,12 +36,12 @@ export default function Sidebar() {
     <>
       <aside className="hidden md:flex w-64 bg-navy text-white min-h-screen flex-col sticky top-0">
         <div className="p-5 flex items-center gap-3 border-b border-white/10">
-          <div className="w-11 h-11 rounded-2xl bg-rescueRed flex items-center justify-center">
-            <HeartHandshake size={26} />
+          <div className="w-11 h-11 rounded-2xl overflow-hidden bg-white shrink-0">
+            <img src="/logorescatevzla.PNG" alt="RescateVZLA" className="w-full h-full object-contain p-0.5" />
           </div>
           <div>
-            <h1 className="font-black leading-5">RescueNet</h1>
-            <p className="text-[11px] tracking-[0.25em] text-blue-100">VENEZUELA</p>
+            <h1 className="font-black leading-5">RescateVZLA</h1>
+            <p className="text-[11px] tracking-[0.25em] text-blue-100">rescatevzla.net</p>
           </div>
         </div>
         <nav className="p-3 flex-1 space-y-1 overflow-y-auto">

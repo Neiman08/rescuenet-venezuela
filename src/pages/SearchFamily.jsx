@@ -35,7 +35,7 @@ export default function SearchFamily() {
           publicLocation: item.publicLocation,
           type: labelForPersonType(item.type),
           hospital: item.hospital || "No indicado",
-          source: item.source || "RescueNet",
+          source: item.source || "RescateVZLA",
         }));
         if (nextRows.length) {
           setRows(nextRows);

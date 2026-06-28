@@ -2,7 +2,7 @@ import { useLocation, matchPath } from "react-router-dom";
 import { appRoutes } from "../config/routes";
 
 const WA_NUMBER = import.meta.env.VITE_PUBLIC_WHATSAPP_NUMBER || "12245914415";
-const WA_MESSAGE = "Hola RescueNet, quiero enviar información sobre una emergencia o persona afectada.";
+const WA_MESSAGE = "Hola RescateVZLA, quiero enviar información sobre una emergencia o persona afectada.";
 const WA_HREF = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(WA_MESSAGE)}`;
 
 const HIDDEN_PATTERNS = [

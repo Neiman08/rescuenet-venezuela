@@ -14,7 +14,7 @@ function normalizeRescued(item) {
     sex: item.sex || item.gender || "No indicado",
     status: item.status || item.verificationStatus || "Rescatado",
     publicLocation: item.publicLocation || item.currentPlace || item.lastSeenPlace || item.zone || "Zona no indicada",
-    source: item.source || item.sourceName || "RescueNet",
+    source: item.source || item.sourceName || "RescateVZLA",
   };
 }
 

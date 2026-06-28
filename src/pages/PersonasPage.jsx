@@ -55,7 +55,7 @@ export default function PersonasPage() {
           sex: item.sex,
           publicLocation: item.publicLocation,
           hospital: item.hospital,
-          source: item.source || "RescueNet",
+          source: item.source || "RescateVZLA",
           type: item.type,
         }));
         setAllRows(rows);
