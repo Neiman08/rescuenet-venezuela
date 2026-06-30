@@ -399,6 +399,16 @@ async function approvedImportedRecordsWithRaw(recordTypes, take = 1000, stateFil
 
 const REDAYUDA_SOURCE = "redayuda";
 
+// Columns needed by buildRedayudaPublicResult. Excluding rawPayload (large), private coord/medical
+// fields, and ingestion metadata cuts fetched data by ~70% and speeds up all person queries.
+const PERSON_SELECT = {
+  id: true, sourceName: true, recordType: true, capturedAt: true, updatedAt: true,
+  verificationStatus: true, privacyLevel: true,
+  fullName: true, approximateAge: true, gender: true, status: true, hospitalName: true,
+  state: true, municipality: true, zone: true, lastSeenPlace: true, currentPlace: true,
+  description: true, publicSafe: true, documentPrivate: true, contactPrivate: true,
+};
+
 // In-memory count cache for listPublicPersons — avoids repeated COUNT+GROUP BY on 189k rows.
 // TTL: 5 minutes. Keyed by serialized WHERE clause.
 const _personCountCache = new Map();
@@ -1280,11 +1290,11 @@ export const publicController = {
 
     let total = null, byType = null, records;
 
+    const findOpts = { where, select: PERSON_SELECT, orderBy: { capturedAt: "desc" }, skip, take: limit };
+
     if (skipCounts) {
       // Load-more path: only fetch the page, skip expensive aggregations
-      records = await prisma.importedHumanitarianRecord.findMany({
-        where, orderBy: { capturedAt: "desc" }, skip, take: limit,
-      });
+      records = await prisma.importedHumanitarianRecord.findMany(findOpts);
     } else {
       const cacheKey = JSON.stringify(where);
       const cached = _getCountCache(cacheKey);
@@ -1293,9 +1303,7 @@ export const publicController = {
         // Count cache hit: only run the page query (1 query instead of 3)
         total   = cached.total;
         byType  = cached.byType;
-        records = await prisma.importedHumanitarianRecord.findMany({
-          where, orderBy: { capturedAt: "desc" }, skip, take: limit,
-        });
+        records = await prisma.importedHumanitarianRecord.findMany(findOpts);
       } else {
         // First-page path: fetch page + counts in parallel, then cache counts
         const [cnt, grp, recs] = await Promise.all([
@@ -1303,9 +1311,7 @@ export const publicController = {
           prisma.importedHumanitarianRecord.groupBy({
             by: ["recordType"], where, _count: { recordType: true },
           }),
-          prisma.importedHumanitarianRecord.findMany({
-            where, orderBy: { capturedAt: "desc" }, skip, take: limit,
-          }),
+          prisma.importedHumanitarianRecord.findMany(findOpts),
         ]);
         total   = cnt;
         byType  = Object.fromEntries(grp.map(t => [t.recordType, t._count.recordType]));
