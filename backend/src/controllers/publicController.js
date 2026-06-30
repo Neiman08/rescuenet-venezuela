@@ -121,24 +121,26 @@ const VZ_LAT = [0.6, 12.3];
 const VZ_LNG = [-73.4, -59.8];
 
 function isInternationalCenter(record) {
-  const lat = record.latitudePrivate != null ? Number(record.latitudePrivate) : null;
-  const lng = record.longitudePrivate != null ? Number(record.longitudePrivate) : null;
+  // Coords are stored as locationPrivate JSON { lat, lng }, not as flat fields
+  const loc = record.locationPrivate || {};
+  const lat = loc.lat != null ? Number(loc.lat) : null;
+  const lng = loc.lng != null ? Number(loc.lng) : null;
   if (lat != null && lng != null) {
     return lat < VZ_LAT[0] || lat > VZ_LAT[1] || lng < VZ_LNG[0] || lng > VZ_LNG[1];
   }
-  // Fallback: check state text against known Venezuelan states
+  // Fallback: check all text fields for non-VZ place indicators
   const stateRaw = record.publicSafe?.state || record.state || "";
+  const allText = `${stateRaw} ${record.publicSafe?.municipality || ""} ${record.publicSafe?.publicLocation || ""}`;
+  // US address pattern: "City, ST 12345"
+  if (/,\s*[A-Z]{2}\s+\d{5}\b/.test(allText)) return true;
+  // Known non-VZ country/state/city names
+  const knownNonVZ = /\b(florida|texas|new york|california|madrid|colombia|peru|chile|argentina|michigan|ohio|virginia|georgia|illinois|new jersey|doral|miami|houston|bogota|lima|santiago|dallas|chicago|atlanta|orlando|tampa|quito|guayaquil|bogotá)\b/i.test(allText);
+  if (knownNonVZ) return true;
   if (!stateRaw) return false;
   const stateNorm = normalizePublicText(stateRaw);
-  // If state is present and not in validPublicStates, likely international
-  // (only flag if it looks like a non-VZ place, not if it's just a neighborhood)
-  const knownNonVZ = /\b(florida|texas|new york|california|madrid|colombia|peru|chile|argentina|michigan|ohio|virginia|georgia|illinois|new jersey)\b/i.test(stateRaw);
-  if (knownNonVZ) return true;
   // If state is clearly a valid VZ state, it's local
   if (validPublicStates.has(stateNorm)) return false;
-  // City-level text containing US/non-VZ city names
-  const allText = `${stateRaw} ${record.publicSafe?.municipality || ""} ${record.publicSafe?.publicLocation || ""}`;
-  return /\b(detroit|miami|houston|bogota|lima|santiago|buenos aires|new york|dallas|chicago|atlanta|orlando|tampa)\b/i.test(allText);
+  return false;
 }
 
 function looksLikeMedicalText(value) {
