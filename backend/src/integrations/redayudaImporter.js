@@ -76,17 +76,17 @@ const PHONE_PATTERN = /\b0(4(12|14|16|24|26)|2\d{2})\d{7}\b/g;
 // Prefijos que anuncian un teléfono en texto descriptivo
 const PHONE_PREFIX = /(?:tel[eé]fono|tel\.?|contactar?\s+al?|llam[ae]\s+al?|whatsapp|ws|cel\.?)\s*:?\s*/gi;
 
-// Cédulas venezolanas en texto libre (V/E/J/P/G + guion opcional + 6-9 dígitos)
-const CEDULA_PATTERN = /\b[VEJPGvejpg]-?\d{6,9}\b/g;
+// Cédulas venezolanas: con prefijo (V/E/J/P/G) o precedidas por la palabra "cedula"/"c.i"
+const CEDULA_PREFIX_PATTERN = /\b[VEJPGvejpg]-?\d{6,9}\b/g;
+const CEDULA_BARE_PATTERN = /(?:c[eé]dula(?:\s+de\s+identidad)?|c\.?i\.?)\s*:?\s*\d{5,9}/gi;
 
 function sanitizePublicText(text) {
   if (!text) return undefined;
-  // Quitar teléfonos (prefijo + número)
-  // Quitar cédulas venezolanas que aparezcan en texto libre
   const cleaned = String(text)
     .replace(PHONE_PREFIX, "")
     .replace(PHONE_PATTERN, "[contacto omitido]")
-    .replace(CEDULA_PATTERN, "[información omitida]")
+    .replace(CEDULA_BARE_PATTERN, "[información omitida]")
+    .replace(CEDULA_PREFIX_PATTERN, "[información omitida]")
     .replace(/\s{2,}/g, " ")
     .trim();
   return cleaned || undefined;
@@ -146,8 +146,8 @@ function mapRecord(redayudaRecord, { capturedAt } = {}) {
     // hospital: solo si no es privado y es hospitalizado
     hospitalName: isPrivate ? undefined : recordType === "hospitalized_person" ? redayudaRecord.organization || undefined : undefined,
     state: redayudaRecord.state || undefined,
-    municipality: redayudaRecord.city || undefined,
-    zone: redayudaRecord.city || redayudaRecord.state || undefined,
+    municipality: sanitizePublicText(redayudaRecord.city) || undefined,
+    zone: sanitizePublicText(redayudaRecord.city || redayudaRecord.state) || undefined,
     lastSeenPlace: isPrivate ? undefined : PERSON_TYPES.has(recordType) ? sanitizePublicText(redayudaRecord.location_name || redayudaRecord.city) : undefined,
     currentPlace: isPrivate ? undefined : PERSON_TYPES.has(recordType) ? sanitizePublicText(redayudaRecord.location_name || redayudaRecord.city) : undefined,
     description: isPrivate ? undefined : sanitizePublicText(redayudaRecord.summary),
