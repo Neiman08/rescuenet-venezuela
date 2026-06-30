@@ -68,7 +68,8 @@ function privacyLevelFor(recordType, tags = [], age = null) {
 function sanitizeName(fullName, privacyLevel) {
   if (!fullName) return undefined;
   if (privacyLevel === "restricted" || privacyLevel === "private_only") return "Informacion protegida";
-  return String(fullName).trim();
+  // Strip cedulas or phones appended to the name by the source (e.g. "Nombre C.I. 12345678")
+  return sanitizePublicText(String(fullName)) || undefined;
 }
 
 // Patrones de teléfono venezolano en texto libre (0412, 0414, 0416, 0424, 0426, 02XX)
@@ -76,9 +77,12 @@ const PHONE_PATTERN = /\b0(4(12|14|16|24|26)|2\d{2})\d{7}\b/g;
 // Prefijos que anuncian un teléfono en texto descriptivo
 const PHONE_PREFIX = /(?:tel[eé]fono|tel\.?|contactar?\s+al?|llam[ae]\s+al?|whatsapp|ws|cel\.?)\s*:?\s*/gi;
 
-// Cédulas venezolanas: con prefijo (V/E/J/P/G) o precedidas por la palabra "cedula"/"c.i"
+// Cédulas venezolanas:
+// 1. Prefijo V/E/J/P/G + dígitos: V-12345678
+// 2. Palabra completa "cedula" + número (puede tener puntos como sep. de miles): cedula:25.964.449
+// 3. Abreviatura estricta "C.I." (ambos puntos obligatorios) + número: C.I. 12345678
 const CEDULA_PREFIX_PATTERN = /\b[VEJPGvejpg]-?\d{6,9}\b/g;
-const CEDULA_BARE_PATTERN = /(?:c[eé]dula(?:\s+de\s+identidad)?|c\.?i\.?)\s*:?\s*\d{5,9}/gi;
+const CEDULA_BARE_PATTERN = /(?:\bcedula(?:\s+de\s+identidad)?\s*:?\s*[\d.,\-]{5,15}|\bc\.i\.\s*:?\s*[\d.,\-]{5,15})/gi;
 
 function sanitizePublicText(text) {
   if (!text) return undefined;

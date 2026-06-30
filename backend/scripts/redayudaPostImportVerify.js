@@ -166,7 +166,10 @@ async function main() {
     delete textFields.photoUrl;
     delete textFields.imageUrl;
     const pubStr = JSON.stringify(textFields);
-    return /\b[VEJPGvejpg]-?\d{6,9}\b/.test(pubStr) || /\bcedula\b/i.test(pubStr);
+    // Cédula con prefijo V/E, palabra completa "cédula", o "C.I." con ambos puntos (estricto)
+    return /\b[VEJPGvejpg]-?\d{6,9}\b/.test(pubStr)
+      || /\bcedula\b.{0,5}[\d.,\-]{5,15}/i.test(pubStr)
+      || /\bc\.i\.\s*:?\s*[\d.,\-]{5,15}/i.test(pubStr);
   });
   const p5 = check("publicSafe no contiene cédulas", withCedula.length === 0,
     withCedula.length ? `${withCedula.length} registros exponen cédula en publicSafe [CRÍTICO]` : "verificado");
