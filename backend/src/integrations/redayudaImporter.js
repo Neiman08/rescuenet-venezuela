@@ -76,12 +76,17 @@ const PHONE_PATTERN = /\b0(4(12|14|16|24|26)|2\d{2})\d{7}\b/g;
 // Prefijos que anuncian un teléfono en texto descriptivo
 const PHONE_PREFIX = /(?:tel[eé]fono|tel\.?|contactar?\s+al?|llam[ae]\s+al?|whatsapp|ws|cel\.?)\s*:?\s*/gi;
 
+// Cédulas venezolanas en texto libre (V/E/J/P/G + guion opcional + 6-9 dígitos)
+const CEDULA_PATTERN = /\b[VEJPGvejpg]-?\d{6,9}\b/g;
+
 function sanitizePublicText(text) {
   if (!text) return undefined;
-  // Primero quitar el prefijo + número, luego limpiar números sueltos
+  // Quitar teléfonos (prefijo + número)
+  // Quitar cédulas venezolanas que aparezcan en texto libre
   const cleaned = String(text)
     .replace(PHONE_PREFIX, "")
     .replace(PHONE_PATTERN, "[contacto omitido]")
+    .replace(CEDULA_PATTERN, "[información omitida]")
     .replace(/\s{2,}/g, " ")
     .trim();
   return cleaned || undefined;
@@ -223,18 +228,29 @@ async function fetchStats(baseUrl, opts) {
  * Recupera registros del feed de Redayuda con paginación por cursor.
  * Devuelve un iterador asíncrono de páginas.
  */
-async function* feedPages(baseUrl, { since = 0, limit = 200, maxRecords = Infinity, timeoutMs = 15_000 } = {}) {
+async function* feedPages(baseUrl, { since = 0, limit = 200, maxRecords = Infinity, timeoutMs = 15_000, delayMs = 300 } = {}) {
   let cursor = since;
   let fetched = 0;
   while (fetched < maxRecords) {
     const url = `${baseUrl}/api/records/feed?since=${cursor}&limit=${limit}`;
-    const page = await fetchJson(url, { timeoutMs });
+    let page;
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      try {
+        page = await fetchJson(url, { timeoutMs });
+        break;
+      } catch (err) {
+        if (attempt === 5) throw err;
+        const wait = delayMs * attempt * 2;
+        await new Promise((r) => setTimeout(r, wait));
+      }
+    }
     const records = page.records || [];
     if (records.length === 0) break;
     yield records;
     fetched += records.length;
     cursor = page.next_cursor || cursor;
     if (!page.has_more) break;
+    if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
   }
 }
 
@@ -281,8 +297,13 @@ export async function runRedayudaImport({
   const dryRun = mode !== "apply";
   const capturedAt = new Date().toISOString();
 
-  // 1. Estadísticas del nodo Redayuda
-  const stats = await fetchStats(baseUrl, { timeoutMs });
+  // 1. Estadísticas del nodo Redayuda (opcional — no bloquear si hay rate limit)
+  let stats = {};
+  try {
+    stats = await fetchStats(baseUrl, { timeoutMs });
+  } catch {
+    stats = { total_records: null, total_sources: null, record_types: {} };
+  }
 
   // 2. Cargar registros existentes en DB para deduplicar (solo en apply)
   let existingSet = new Set();
@@ -294,7 +315,31 @@ export async function runRedayudaImport({
     existingSet = buildSeenSet(existing);
   }
 
+  // Tamaño de lote para inserts en bloque (reduce round-trips a la DB remota)
+  const BATCH_SIZE = 200;
+
+  async function flushBatch(client, batch) {
+    let imported = 0;
+    let errors = 0;
+    try {
+      await client.$transaction(batch.map((data) => client.importedHumanitarianRecord.create({ data })));
+      imported = batch.length;
+    } catch {
+      // Si falla el lote, intentar uno por uno para aislar errores
+      for (const data of batch) {
+        try {
+          await client.importedHumanitarianRecord.create({ data });
+          imported += 1;
+        } catch {
+          errors += 1;
+        }
+      }
+    }
+    return { imported, errors };
+  }
+
   // 3. Consumir el feed y procesar registros
+  let pendingBatch = [];
   const counts = {
     total: 0,
     byType: {},
@@ -339,21 +384,29 @@ export async function runRedayudaImport({
         });
       }
 
-      // En modo apply: deduplicar y escribir
+      // En modo apply: acumular en lote para flush por transacción
       if (!dryRun && prismaClient) {
         if (existingSet.has(mapped.sourceRecordId)) {
           counts.skippedDuplicates += 1;
           continue;
         }
-        try {
-          await prismaClient.importedHumanitarianRecord.create({ data: mapped });
-          existingSet.add(mapped.sourceRecordId);
-          counts.imported += 1;
-        } catch {
-          counts.errors += 1;
+        pendingBatch.push(mapped);
+        existingSet.add(mapped.sourceRecordId);
+        if (pendingBatch.length >= BATCH_SIZE) {
+          const { imported, errors } = await flushBatch(prismaClient, pendingBatch);
+          counts.imported += imported;
+          counts.errors += errors;
+          pendingBatch = [];
         }
       }
     }
+  }
+
+  // Flush registros restantes en el lote parcial
+  if (!dryRun && prismaClient && pendingBatch.length > 0) {
+    const { imported, errors } = await flushBatch(prismaClient, pendingBatch);
+    counts.imported += imported;
+    counts.errors += errors;
   }
 
   // 4. Riesgos de privacidad detectados

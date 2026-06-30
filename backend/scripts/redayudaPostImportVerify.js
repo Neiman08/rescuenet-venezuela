@@ -157,9 +157,15 @@ async function main() {
   if (!p4) allPass = false;
 
   // e) publicSafe no contiene cédula
+  // Nota: photoUrl se excluye del escaneo — Cloudinary/Supabase usan patrones
+  //       como v1234567 en rutas de URL que el regex detecta como falso positivo.
   const withCedula = imported.filter(r => {
-    const pubStr = JSON.stringify(r.publicSafe || {});
-    // Buscar patrones de cédula venezolana (7-8 dígitos)
+    const pub = r.publicSafe || {};
+    // Serializar solo campos de texto (excluir URLs)
+    const textFields = { ...pub };
+    delete textFields.photoUrl;
+    delete textFields.imageUrl;
+    const pubStr = JSON.stringify(textFields);
     return /\b[VEJPGvejpg]-?\d{6,9}\b/.test(pubStr) || /\bcedula\b/i.test(pubStr);
   });
   const p5 = check("publicSafe no contiene cédulas", withCedula.length === 0,
