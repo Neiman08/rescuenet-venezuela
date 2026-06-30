@@ -12,3 +12,9 @@ export const prisma = new PrismaClient({
   datasources: { db: { url: withPoolParams(process.env.DATABASE_URL) } },
   log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
 });
+
+// Update planner statistics on startup so new indexes created by migrations are used
+// immediately instead of waiting hours for autovacuum on Render free tier.
+prisma.$connect().then(() =>
+  prisma.$executeRaw`ANALYZE "ImportedHumanitarianRecord"`
+).catch(() => {});
