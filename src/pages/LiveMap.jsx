@@ -25,17 +25,21 @@ export default function LiveMap() {
   const [zones, setZones] = useState([]);
   const [reports, setReports] = useState([]);
   const [status, setStatus] = useState("loading");
+  const [includeInternational, setIncludeInternational] = useState(false);
+  const [internationalCount, setInternationalCount] = useState(0);
 
   useEffect(() => {
-    publicApi.getMap()
+    setStatus("loading");
+    publicApi.getMap({ includeInternational })
       .then((payload) => {
         const nextZones = payload?.zones || [];
+        setInternationalCount(payload?.internationalCentersCount || 0);
         const resourceReports = [
           ...(payload?.hospitals || []).map((item) => ({ id: `hospital-${item.id || item.name}`, type: "Hospital", status: item.status || item.operationalStatus || "Operativo", zone: item.affectedZone?.sector || item.publicLocation, affectedZone: item.affectedZone || item.affectedOperationalZone, color: "blue" })),
           ...(payload?.shelters || []).map((item) => ({ id: `shelter-${item.id || item.name}`, type: "Refugio", status: item.status || item.operationalStatus || "Operativo", zone: item.affectedZone?.sector || item.publicLocation, affectedZone: item.affectedZone || item.affectedOperationalZone, color: "green" })),
           ...(payload?.helpCenters || []).map((item) => {
             const [type, color] = mapCenterType(item.recordType);
-            return { id: `center-${item.id || item.name}`, type, status: item.operationalStatus || "Aprobado", zone: item.publicLocation || item.zone, affectedZone: item.affectedOperationalZone, color };
+            return { id: `center-${item.id || item.name}`, type, status: item.operationalStatus || "Aprobado", zone: item.publicLocation || item.zone, affectedZone: item.affectedOperationalZone, color, isInternational: item.isInternational };
           }),
         ];
         const nextReports = [...(payload?.reports || []), ...resourceReports];
@@ -48,7 +52,7 @@ export default function LiveMap() {
         setReports([]);
         setStatus("error");
       });
-  }, []);
+  }, [includeInternational]);
 
   return (
     <div className="space-y-6">
@@ -85,6 +89,15 @@ export default function LiveMap() {
                 <span className="text-xs text-slate-500">{layer.status}</span>
               </label>
             ))}
+            <label className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeInternational}
+                onChange={(e) => setIncludeInternational(e.target.checked)}
+              />
+              <span className="font-semibold flex-1">Centros internacionales</span>
+              <span className="text-xs text-amber-600 font-medium">{internationalCount} diaspora</span>
+            </label>
           </div>
         </aside>
         <section className="card p-5 h-[720px]">

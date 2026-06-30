@@ -116,6 +116,31 @@ const validPublicStates = new Set([
   "zulia",
 ]);
 
+// Venezuela bounding box (lat, lng)
+const VZ_LAT = [0.6, 12.3];
+const VZ_LNG = [-73.4, -59.8];
+
+function isInternationalCenter(record) {
+  const lat = record.latitudePrivate != null ? Number(record.latitudePrivate) : null;
+  const lng = record.longitudePrivate != null ? Number(record.longitudePrivate) : null;
+  if (lat != null && lng != null) {
+    return lat < VZ_LAT[0] || lat > VZ_LAT[1] || lng < VZ_LNG[0] || lng > VZ_LNG[1];
+  }
+  // Fallback: check state text against known Venezuelan states
+  const stateRaw = record.publicSafe?.state || record.state || "";
+  if (!stateRaw) return false;
+  const stateNorm = normalizePublicText(stateRaw);
+  // If state is present and not in validPublicStates, likely international
+  // (only flag if it looks like a non-VZ place, not if it's just a neighborhood)
+  const knownNonVZ = /\b(florida|texas|new york|california|madrid|colombia|peru|chile|argentina|michigan|ohio|virginia|georgia|illinois|new jersey)\b/i.test(stateRaw);
+  if (knownNonVZ) return true;
+  // If state is clearly a valid VZ state, it's local
+  if (validPublicStates.has(stateNorm)) return false;
+  // City-level text containing US/non-VZ city names
+  const allText = `${stateRaw} ${record.publicSafe?.municipality || ""} ${record.publicSafe?.publicLocation || ""}`;
+  return /\b(detroit|miami|houston|bogota|lima|santiago|buenos aires|new york|dallas|chicago|atlanta|orlando|tampa)\b/i.test(allText);
+}
+
 function looksLikeMedicalText(value) {
   return /politraumat|trauma|fractur|quemadur|herid|lesion|lesión|diagnost|dolor|sangr|uci|grave|critico|crítico|estable|shock|contus|hematoma|paro|insuficiencia|neumon|diabet|hipertensi|embaraz|fallecid|muert|cadaver|cadáver|triaje|triage|medicina interna|emergencia medica|sala de/i.test(String(value || ""));
 }
@@ -215,7 +240,49 @@ function normalizeImportedPersonPublicFields(publicRecord, recordType) {
   return safeRecord;
 }
 
+function buildPublicRecord(record) {
+  const publicRecord = {
+    id: record.id,
+    ...record.publicSafe,
+    recordType: record.publicSafe?.recordType || record.recordType,
+    state: record.publicSafe?.state || record.state,
+    municipality: record.publicSafe?.municipality || record.municipality,
+    publicLocation: record.publicSafe?.publicLocation || record.publicLocation,
+    zone: record.publicSafe?.zone || record.zone,
+    latitudePrivate: record.latitudePrivate,
+    longitudePrivate: record.longitudePrivate,
+    verificationStatus: record.verificationStatus,
+  };
+  const safePublicRecord = repairLegacyGoogleDriveHospitalizedPublicRecord(
+    normalizeImportedPersonPublicFields(publicRecord, record.recordType),
+    record.sourceName,
+  );
+  if (familySearchTypes.includes(record.recordType) && isHeaderPersonRecord(safePublicRecord)) return null;
+  if (operationalResourceTypes.has(record.recordType)) {
+    // Intenta clasificar en una zona operacional. Si el centro está fuera de las zonas
+    // registradas (p.ej. centros de Redayuda en otras regiones), lo incluye sin zona
+    // para que igual aparezca en el mapa.
+    const classified = withOperationalClassification(safePublicRecord, record.recordType);
+    return classified ?? { ...safePublicRecord, recordType: record.recordType, operationalType: classifyOperationalResource(record.recordType), earthquakeRelated: false };
+  }
+  return safePublicRecord;
+}
+
 async function approvedImportedRecords(recordTypes, take = 500) {
+  try {
+    const records = await prisma.importedHumanitarianRecord.findMany({
+      where: { deletedAt: null, verificationStatus: "APROBADO", recordType: { in: recordTypes } },
+      orderBy: { capturedAt: "desc" },
+      take,
+    });
+    return records.map(buildPublicRecord).filter(Boolean).map(stripInternalPublicFields);
+  } catch {
+    return [];
+  }
+}
+
+// Variant that tags centers as _isInternational before stripping coords
+async function approvedImportedRecordsWithRaw(recordTypes, take = 1000) {
   try {
     const records = await prisma.importedHumanitarianRecord.findMany({
       where: { deletedAt: null, verificationStatus: "APROBADO", recordType: { in: recordTypes } },
@@ -224,28 +291,13 @@ async function approvedImportedRecords(recordTypes, take = 500) {
     });
     return records
       .map((record) => {
-        const publicRecord = {
-        id: record.id,
-        ...record.publicSafe,
-        recordType: record.publicSafe?.recordType || record.recordType,
-        state: record.publicSafe?.state || record.state,
-        municipality: record.publicSafe?.municipality || record.municipality,
-        publicLocation: record.publicSafe?.publicLocation || record.publicLocation,
-        zone: record.publicSafe?.zone || record.zone,
-        latitudePrivate: record.latitudePrivate,
-        longitudePrivate: record.longitudePrivate,
-        verificationStatus: record.verificationStatus,
-        };
-        const safePublicRecord = repairLegacyGoogleDriveHospitalizedPublicRecord(
-          normalizeImportedPersonPublicFields(publicRecord, record.recordType),
-          record.sourceName,
-        );
-        if (familySearchTypes.includes(record.recordType) && isHeaderPersonRecord(safePublicRecord)) return null;
-        return stripInternalPublicFields(operationalResourceTypes.has(record.recordType)
-          ? withOperationalClassification(safePublicRecord, record.recordType)
-          : safePublicRecord);
+        const built = buildPublicRecord(record);
+        if (!built) return null;
+        // Tag before coords are stripped
+        return { ...built, _isInternational: isInternationalCenter(record) };
       })
-      .filter(Boolean);
+      .filter(Boolean)
+      .map(stripInternalPublicFields);
   } catch {
     return [];
   }
@@ -721,7 +773,8 @@ export const publicController = {
     });
   }),
 
-  publicMap: asyncHandler(async (_req, res) => {
+  publicMap: asyncHandler(async (req, res) => {
+    const includeInternational = req.query.includeInternational === "true";
     const map = await MapService.liveMap();
     const hospitals = map.hospitals
       .filter(isInAffectedOperationalZone)
@@ -734,6 +787,10 @@ export const publicController = {
       .map((record) => withOperationalClassification(record, "shelter"))
       .filter(Boolean);
     const importedPeople = await approvedImportedRecords(familySearchTypes, 500);
+    const allCenters = await approvedImportedRecordsWithRaw(publicCenterTypes);
+    const localCenters = allCenters.filter((c) => !c._isInternational).map(({ _isInternational, ...r }) => r);
+    const internationalCenters = allCenters.filter((c) => c._isInternational).map(({ _isInternational, ...r }) => ({ ...r, isInternational: true }));
+    const helpCenters = includeInternational ? [...localCenters, ...internationalCenters] : localCenters;
     res.json({
       zones: affectedOperationalZones.map(publicOperationalZone),
       reports: [
@@ -742,7 +799,8 @@ export const publicController = {
       ],
       shelters,
       hospitals,
-      helpCenters: await approvedImportedRecords(publicCenterTypes),
+      helpCenters,
+      internationalCentersCount: internationalCenters.length,
     });
   }),
 

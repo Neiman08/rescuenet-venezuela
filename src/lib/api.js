@@ -52,7 +52,7 @@ export const publicApi = {
   getMissingReports: () => request("/missing/public"),
   getRescued: () => request("/rescued/public"),
   getHospitalized: () => request("/hospitalized/public"),
-  getMap: () => request("/map/public"),
+  getMap: ({ includeInternational = false } = {}) => request(`/map/public${includeInternational ? "?includeInternational=true" : ""}`),
   getDashboard: () => request("/dashboard/public"),
   getAffectedZones: () => request("/affected-zones/public"),
   getHelpCenters: () => request("/help-centers/public"),
