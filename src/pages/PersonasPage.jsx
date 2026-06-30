@@ -265,7 +265,7 @@ export default function PersonasPage() {
               className="bg-transparent outline-none text-sm w-full placeholder:text-slate-400"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Nombre, apellido, cédula, teléfono, hospital, zona…"
+              placeholder="Nombre, apellido o cédula/teléfono…"
               autoComplete="off"
             />
             {inputValue && (

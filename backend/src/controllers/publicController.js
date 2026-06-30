@@ -1263,17 +1263,13 @@ export const publicController = {
                 { contactPrivate: { contains: normalizeDocument(documentQ) } },
               ],
         }] : []),
+        // Only search name columns — both have GIN trigram indexes.
+        // Unindexed ILIKE on description/hospitalName/zone would force a full 189k-row scan.
+        // State/municipality filtering uses the ?state= / ?municipality= params instead.
         ...(q ? [{
           OR: [
             { fullName: { contains: q, mode: "insensitive" } },
             { name: { contains: q, mode: "insensitive" } },
-            { description: { contains: q, mode: "insensitive" } },
-            { hospitalName: { contains: q, mode: "insensitive" } },
-            { zone: { contains: q, mode: "insensitive" } },
-            { municipality: { contains: q, mode: "insensitive" } },
-            { state: { contains: q, mode: "insensitive" } },
-            { currentPlace: { contains: q, mode: "insensitive" } },
-            { lastSeenPlace: { contains: q, mode: "insensitive" } },
           ],
         }] : []),
         ...(stateQ ? [{ OR: [
