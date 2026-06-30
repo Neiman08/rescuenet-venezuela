@@ -155,12 +155,17 @@ export default function PersonasPage() {
     }
   }, []);
 
-  // Build API params
+  // Build API params. Pure-digit input (5–15 chars) is treated as a cédula/phone and
+  // routed to ?cedula= so the backend uses the JSON-path index instead of a full ILIKE scan.
   const buildParams = useCallback((page, skipCounts) => {
     const p = { page, limit: 50 };
     if (skipCounts) p.counts = "false";
     if (activeTab !== "all") p.type = activeTab;
-    if (inputValue.trim()) p.q = inputValue.trim();
+    const v = inputValue.trim();
+    if (v) {
+      if (/^\d{5,15}$/.test(v)) p.cedula = v;
+      else p.q = v;
+    }
     if (stateFilter) p.state = stateFilter;
     return p;
   }, [activeTab, inputValue, stateFilter]);

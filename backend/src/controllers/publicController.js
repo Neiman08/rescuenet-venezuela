@@ -399,6 +399,17 @@ async function approvedImportedRecordsWithRaw(recordTypes, take = 1000, stateFil
 
 const REDAYUDA_SOURCE = "redayuda";
 
+// In-memory count cache for listPublicPersons — avoids repeated COUNT+GROUP BY on 189k rows.
+// TTL: 5 minutes. Keyed by serialized WHERE clause.
+const _personCountCache = new Map();
+const _COUNT_TTL = 5 * 60 * 1000;
+function _getCountCache(k) {
+  const e = _personCountCache.get(k);
+  if (!e || Date.now() - e.ts > _COUNT_TTL) { _personCountCache.delete(k); return null; }
+  return e.val;
+}
+function _setCountCache(k, v) { _personCountCache.set(k, { val: v, ts: Date.now() }); }
+
 const publicCenterTypes = ["collection_center", "shelter", "hospital", "help_center", "water_point", "food_point", "medical_point", "volunteer_center", "pet_aid_center", "logistics_center", "donation_need"];
 const familySearchTypes = ["missing_person", "hospitalized_person", "trapped_person", "safe_person", "rescued_person", "deceased_person"];
 const operationalResourceTypes = new Set([...publicCenterTypes, "hospital"]);
@@ -1214,7 +1225,7 @@ export const publicController = {
     const page  = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, Number(req.query.limit || req.query.take) || 50));
     const skip  = (page - 1) * limit;
-    // counts=false skips expensive COUNT + GROUP BY (used by load-more requests)
+    // counts=false skips expensive COUNT + GROUP BY on load-more requests
     const skipCounts = req.query.counts === "false";
 
     const typeParam    = req.query.type;
@@ -1270,19 +1281,32 @@ export const publicController = {
         where, orderBy: { capturedAt: "desc" }, skip, take: limit,
       });
     } else {
-      // First-page path: fetch page + counts in parallel
-      const [cnt, grp, recs] = await Promise.all([
-        prisma.importedHumanitarianRecord.count({ where }),
-        prisma.importedHumanitarianRecord.groupBy({
-          by: ["recordType"], where, _count: { recordType: true },
-        }),
-        prisma.importedHumanitarianRecord.findMany({
+      const cacheKey = JSON.stringify(where);
+      const cached = _getCountCache(cacheKey);
+
+      if (cached) {
+        // Count cache hit: only run the page query (1 query instead of 3)
+        total   = cached.total;
+        byType  = cached.byType;
+        records = await prisma.importedHumanitarianRecord.findMany({
           where, orderBy: { capturedAt: "desc" }, skip, take: limit,
-        }),
-      ]);
-      total   = cnt;
-      byType  = Object.fromEntries(grp.map(t => [t.recordType, t._count.recordType]));
-      records = recs;
+        });
+      } else {
+        // First-page path: fetch page + counts in parallel, then cache counts
+        const [cnt, grp, recs] = await Promise.all([
+          prisma.importedHumanitarianRecord.count({ where }),
+          prisma.importedHumanitarianRecord.groupBy({
+            by: ["recordType"], where, _count: { recordType: true },
+          }),
+          prisma.importedHumanitarianRecord.findMany({
+            where, orderBy: { capturedAt: "desc" }, skip, take: limit,
+          }),
+        ]);
+        total   = cnt;
+        byType  = Object.fromEntries(grp.map(t => [t.recordType, t._count.recordType]));
+        records = recs;
+        _setCountCache(cacheKey, { total, byType });
+      }
     }
 
     res.json({

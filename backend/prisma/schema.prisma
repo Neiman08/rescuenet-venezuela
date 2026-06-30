@@ -673,6 +673,7 @@ model ImportedHumanitarianRecord {
   @@index([possibleDuplicate, duplicateScore])
   @@index([matchedRecordId])
   @@index([deletedAt])
+  @@index([recordType, capturedAt(sort: Desc)])
 }
 
 model IngestionAuditLog {
