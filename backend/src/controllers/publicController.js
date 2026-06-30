@@ -410,9 +410,9 @@ const PERSON_SELECT = {
 };
 
 // In-memory count cache for listPublicPersons — avoids repeated COUNT+GROUP BY on 189k rows.
-// TTL: 5 minutes. Keyed by serialized WHERE clause.
+// TTL: 30 minutes. Data changes only on imports; stale count for 30 min is acceptable.
 const _personCountCache = new Map();
-const _COUNT_TTL = 5 * 60 * 1000;
+const _COUNT_TTL = 30 * 60 * 1000;
 function _getCountCache(k) {
   const e = _personCountCache.get(k);
   if (!e || Date.now() - e.ts > _COUNT_TTL) { _personCountCache.delete(k); return null; }
@@ -1301,18 +1301,21 @@ export const publicController = {
         byType  = cached.byType;
         records = await prisma.importedHumanitarianRecord.findMany(findOpts);
       } else {
-        // First-page path: fetch page + counts in parallel, then cache counts
-        const [cnt, grp, recs] = await Promise.all([
+        // Cache miss: return records immediately while populating cache in background.
+        // The first response has total=null (frontend shows "Cargando..."); all subsequent
+        // requests within 30 min return the cached count and are instant.
+        records = await prisma.importedHumanitarianRecord.findMany(findOpts);
+        Promise.all([
           prisma.importedHumanitarianRecord.count({ where }),
           prisma.importedHumanitarianRecord.groupBy({
             by: ["recordType"], where, _count: { recordType: true },
           }),
-          prisma.importedHumanitarianRecord.findMany(findOpts),
-        ]);
-        total   = cnt;
-        byType  = Object.fromEntries(grp.map(t => [t.recordType, t._count.recordType]));
-        records = recs;
-        _setCountCache(cacheKey, { total, byType });
+        ]).then(([cnt, grp]) => {
+          _setCountCache(cacheKey, {
+            total: cnt,
+            byType: Object.fromEntries(grp.map(t => [t.recordType, t._count.recordType])),
+          });
+        }).catch(() => {}); // background — don't fail the request
       }
     }
 
