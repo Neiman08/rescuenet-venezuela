@@ -8,20 +8,20 @@ const WA_NUMBER = import.meta.env.VITE_PUBLIC_WHATSAPP_NUMBER || "12245914415";
 const WA_MSG = encodeURIComponent("Hola RescateVZLA, quiero enviar información sobre una persona afectada.");
 
 const TYPE_CONFIG = {
-  missing_person:      { label: "Desaparecido/a",  badge: "bg-red-100 text-red-700"       },
-  hospitalized_person: { label: "Hospitalizado/a", badge: "bg-blue-100 text-blue-700"     },
-  rescued_person:      { label: "Rescatado/a",     badge: "bg-emerald-100 text-emerald-700" },
-  safe_person:         { label: "A salvo",          badge: "bg-green-100 text-green-700"   },
-  trapped_person:      { label: "Atrapado/a",      badge: "bg-orange-100 text-orange-700" },
-  deceased_person:     { label: "Fallecido/a",     badge: "bg-slate-200 text-slate-600"   },
+  missing_person:      { label: "Desaparecido/a",  badge: "bg-red-100 text-red-700"          },
+  hospitalized_person: { label: "Hospitalizado/a", badge: "bg-blue-100 text-blue-700"        },
+  rescued_person:      { label: "Rescatado/a",     badge: "bg-emerald-100 text-emerald-700"  },
+  safe_person:         { label: "A salvo",          badge: "bg-green-100 text-green-700"      },
+  trapped_person:      { label: "Atrapado/a",      badge: "bg-orange-100 text-orange-700"    },
+  deceased_person:     { label: "Fallecido/a",     badge: "bg-slate-200 text-slate-600"      },
 };
 
 const TABS = [
-  { key: "all",                 label: "Todos"              },
-  { key: "missing_person",      label: "Desaparecidos"      },
-  { key: "hospitalized_person", label: "Hospitalizados"     },
-  { key: "safe_person",         label: "Localizados/A salvo"},
-  { key: "deceased_person",     label: "Fallecidos"         },
+  { key: "all",                 label: "Todos"               },
+  { key: "missing_person",      label: "Desaparecidos"       },
+  { key: "hospitalized_person", label: "Hospitalizados"      },
+  { key: "safe_person",         label: "Localizados / A salvo" },
+  { key: "deceased_person",     label: "Fallecidos"          },
 ];
 
 const VENEZUELA_STATES = [
@@ -40,20 +40,20 @@ function PersonCard({ person }) {
   const date = person.capturedAt || person.updatedAt
     ? new Date(person.capturedAt || person.updatedAt).toLocaleDateString("es-VE", { day: "2-digit", month: "short", year: "numeric" })
     : null;
-  const name = person.fullName || person.name;
-  const age = person.approximateAge || person.age;
-  const gender = person.gender || person.sex;
-  const location = fmt(person.publicLocation) || fmt(person.currentPlace) || fmt(person.lastSeenPlace) || fmt(person.zone);
-  const state = fmt(person.state);
-  const muni = fmt(person.municipality);
-  const hospital = fmt(person.hospital) || fmt(person.hospitalName);
+  const name      = person.fullName || person.name;
+  const age       = person.approximateAge || person.age;
+  const gender    = person.gender || person.sex;
+  const location  = fmt(person.publicLocation) || fmt(person.currentPlace) || fmt(person.lastSeenPlace) || fmt(person.zone);
+  const state     = fmt(person.state);
+  const muni      = fmt(person.municipality);
+  const hospital  = fmt(person.hospital) || fmt(person.hospitalName);
   const isRedayuda = person.isRedayuda || person.source === "Redayuda";
 
   return (
     <div className="card p-4 space-y-2 hover:shadow-md transition-shadow border border-slate-100">
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
-        <p className="font-black text-slate-800 leading-snug text-sm">{name || "Nombre protegido"}</p>
+        <p className="font-black text-slate-800 leading-snug text-sm">{name || "Nombre no disponible"}</p>
         <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${cfg.badge}`}>
           {cfg.label}
         </span>
@@ -96,7 +96,7 @@ function PersonCard({ person }) {
         <p className="text-xs text-slate-500 line-clamp-2">{person.description}</p>
       )}
 
-      {/* Cedula + Phone (Redayuda standard records) */}
+      {/* Cedula + Phone (Redayuda) */}
       {person.cedula && (
         <p className="text-xs text-slate-600">
           <span className="font-semibold">Cédula:</span> {person.cedula}
@@ -108,8 +108,8 @@ function PersonCard({ person }) {
         </p>
       )}
 
-      {/* Status (description) */}
-      {person.status && person.status !== "activo" && person.status !== "Sin información" && (
+      {/* Status */}
+      {person.status && !["activo", "Sin información"].includes(person.status) && (
         <p className="text-xs text-slate-500">
           <span className="font-semibold">Estado:</span> {person.status}
         </p>
@@ -134,26 +134,36 @@ function PersonCard({ person }) {
 export default function PersonasPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // Input state (delayed — only fires on submit or tab change)
   const [inputValue, setInputValue]   = useState(searchParams.get("q") || "");
   const [activeTab, setActiveTab]     = useState(searchParams.get("type") || "all");
   const [stateFilter, setStateFilter] = useState(searchParams.get("state") || "");
-  const [muniFilter, setMuniFilter]   = useState(searchParams.get("municipality") || "");
 
+  // Data state
   const [rows, setRows]               = useState([]);
-  const [meta, setMeta]               = useState({ total: 0, pages: 1, page: 1, byType: {} });
+  const [meta, setMeta]               = useState({ total: null, pages: null, page: 1, byType: {} });
   const [fetchStatus, setFetchStatus] = useState("loading");
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const abortRef = useRef(null);
+  const searchRef = useRef(null);
+  const abortRef  = useRef(null);
 
-  const buildParams = useCallback((page = 1, append = false) => {
+  // Auto-focus search input when navigated here with ?q=
+  useEffect(() => {
+    if (searchParams.get("q") && searchRef.current) {
+      searchRef.current.focus();
+    }
+  }, []);
+
+  // Build API params
+  const buildParams = useCallback((page, skipCounts) => {
     const p = { page, limit: 50 };
+    if (skipCounts) p.counts = "false";
     if (activeTab !== "all") p.type = activeTab;
     if (inputValue.trim()) p.q = inputValue.trim();
     if (stateFilter) p.state = stateFilter;
-    if (muniFilter) p.municipality = muniFilter;
-    return { p, append };
-  }, [activeTab, inputValue, stateFilter, muniFilter]);
+    return p;
+  }, [activeTab, inputValue, stateFilter]);
 
   const fetchPage = useCallback(async (page = 1, append = false) => {
     if (abortRef.current) abortRef.current.abort();
@@ -164,115 +174,134 @@ export default function PersonasPage() {
     else setLoadingMore(true);
 
     try {
-      const params = {};
-      if (activeTab !== "all") params.type = activeTab;
-      if (inputValue.trim()) params.q = inputValue.trim();
-      if (stateFilter) params.state = stateFilter;
-      if (muniFilter) params.municipality = muniFilter;
-      params.page = page;
-      params.limit = 50;
-
+      // Skip expensive COUNT + GROUP BY on load-more requests (page > 1)
+      const params = buildParams(page, page > 1);
       const payload = await publicApi.listPersons(params);
-      const next = payload.data || [];
-      const nextMeta = payload.meta || { total: next.length, pages: 1, page: 1, byType: {} };
+      const next     = payload.data || [];
+      const nextMeta = payload.meta || {};
 
       setRows(prev => append ? [...prev, ...next] : next);
-      setMeta(nextMeta);
-      setFetchStatus(next.length || (append && rows.length) ? "success" : "empty");
+
+      if (page === 1) {
+        // First page: store full meta (total, pages, byType)
+        setMeta(nextMeta);
+      } else {
+        // Load-more: keep total/pages/byType from page 1, just update current page
+        setMeta(prev => ({ ...prev, page: nextMeta.page ?? page }));
+      }
+
+      const hasResults = next.length > 0 || (append && rows.length > 0);
+      setFetchStatus(hasResults ? "success" : "empty");
     } catch (err) {
       if (err.name === "AbortError") return;
       setFetchStatus(append ? "success" : "error");
     } finally {
       setLoadingMore(false);
     }
-  }, [activeTab, inputValue, stateFilter, muniFilter]);
+  }, [buildParams]);
 
-  // Fetch on filter/tab change
+  // Refetch from page 1 when filters/tab change
   useEffect(() => {
     fetchPage(1, false);
   }, [fetchPage]);
 
-  // Sync URL
+  // Sync URL params
   useEffect(() => {
     const p = {};
     if (inputValue.trim()) p.q = inputValue.trim();
     if (activeTab !== "all") p.type = activeTab;
     if (stateFilter) p.state = stateFilter;
-    if (muniFilter) p.municipality = muniFilter;
     setSearchParams(p, { replace: true });
-  }, [inputValue, activeTab, stateFilter, muniFilter]);
+  }, [inputValue, activeTab, stateFilter]);
 
   function handleSearch(e) {
     e.preventDefault();
     fetchPage(1, false);
   }
 
+  function handleTabChange(key) {
+    setActiveTab(key);
+  }
+
   function handleLoadMore() {
     fetchPage(meta.page + 1, true);
   }
 
+  const fmtN = (n) => n != null ? n.toLocaleString("es-VE") : "—";
+
+  // Show "Ver más" when we know there's more data
+  const hasMore = meta.total != null
+    ? rows.length < meta.total
+    : meta.page < (meta.pages || 0);
+
   const tabCount = (key) => {
     if (key === "all") return meta.total;
-    return meta.byType?.[key] || 0;
+    return meta.byType?.[key] ?? null;
   };
-
-  const fmtTotal = (n) => n != null ? n.toLocaleString("es-VE") : "—";
 
   return (
     <div className="space-y-6">
       <SectionTitle
         title="Personas"
-        subtitle={`${fmtTotal(meta.total)} personas registradas · Datos de RedAyuda y reportes ciudadanos`}
-        action={
-          <Link className="btn bg-rescueBlue text-white flex items-center gap-2" to="/publicar-busqueda">
-            <UserPlus size={18} /> Publicar búsqueda
-          </Link>
+        subtitle={
+          meta.total != null
+            ? `${fmtN(meta.total)} personas registradas · Datos de RedAyuda y reportes ciudadanos`
+            : "Cargando registros…"
         }
       />
 
-      {/* Search bar */}
-      <form onSubmit={handleSearch} className="card p-4 flex flex-col sm:flex-row gap-3">
-        <div className="flex-1 flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-2.5">
-          <Search size={18} className="text-slate-400 shrink-0" />
-          <input
-            className="bg-transparent outline-none text-sm w-full placeholder:text-slate-400"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Nombre, apellido, cédula, teléfono, hospital, zona…"
-            autoComplete="off"
-          />
-          {inputValue && (
-            <button
-              type="button"
-              onClick={() => setInputValue("")}
-              className="text-slate-400 hover:text-slate-700 text-xl leading-none px-1"
-              aria-label="Limpiar búsqueda"
-            >
-              <X size={16} />
-            </button>
-          )}
-        </div>
-        <button type="submit" className="btn bg-navy text-white flex items-center justify-center gap-2">
-          <Search size={16} /> Buscar
-        </button>
-      </form>
+      {/* ── Search bar + Publicar búsqueda ─────────────────────────────── */}
+      <div className="card p-4 space-y-3">
+        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-2.5">
+            <Search size={18} className="text-slate-400 shrink-0" />
+            <input
+              ref={searchRef}
+              className="bg-transparent outline-none text-sm w-full placeholder:text-slate-400"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Nombre, apellido, cédula, teléfono, hospital, zona…"
+              autoComplete="off"
+            />
+            {inputValue && (
+              <button
+                type="button"
+                onClick={() => setInputValue("")}
+                className="text-slate-400 hover:text-slate-700"
+                aria-label="Limpiar"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+          <button type="submit" className="btn bg-navy text-white flex items-center justify-center gap-2">
+            <Search size={16} /> Buscar
+          </button>
+          <Link
+            to="/publicar-busqueda"
+            className="btn bg-rescueBlue text-white flex items-center justify-center gap-2 whitespace-nowrap"
+          >
+            <UserPlus size={16} /> Publicar búsqueda
+          </Link>
+        </form>
+      </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
+      {/* ── Filters ────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap gap-3 items-center">
         <div className="relative">
           <select
             value={stateFilter}
-            onChange={(e) => { setStateFilter(e.target.value); setMuniFilter(""); }}
+            onChange={(e) => setStateFilter(e.target.value)}
             className="appearance-none bg-white border border-slate-200 rounded-xl px-3 py-2 pr-8 text-sm text-slate-700 focus:outline-none focus:border-navy"
           >
             <option value="">Todos los estados</option>
             {VENEZUELA_STATES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         </div>
         {stateFilter && (
           <button
-            onClick={() => { setStateFilter(""); setMuniFilter(""); }}
+            onClick={() => setStateFilter("")}
             className="flex items-center gap-1 text-xs text-slate-500 border border-slate-200 rounded-xl px-3 py-2 hover:bg-slate-50"
           >
             <X size={12} /> {stateFilter}
@@ -280,20 +309,22 @@ export default function PersonasPage() {
         )}
       </div>
 
-      {/* Tabs */}
+      {/* ── Tabs ───────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-2">
         {TABS.map((tab) => {
           const count = tabCount(tab.key);
           return (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => handleTabChange(tab.key)}
               className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
-                activeTab === tab.key ? "bg-navy text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                activeTab === tab.key
+                  ? "bg-navy text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
               {tab.label}
-              {count > 0 && (
+              {count != null && count > 0 && (
                 <span className="ml-1.5 opacity-70 font-normal text-xs">
                   ({count >= 1000 ? `${Math.floor(count / 1000)}k+` : count})
                 </span>
@@ -303,15 +334,15 @@ export default function PersonasPage() {
         })}
       </div>
 
-      {/* Source notice */}
-      <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
-        <div className="text-xs text-amber-800">
-          <span className="font-bold">Datos RedAyuda:</span> Esta información proviene de la Red Humanitaria Federada Redayuda, utilizada con autorización para localización de personas durante la emergencia. Aparece marcada como{" "}
-          <span className="font-semibold">Fuente: RedAyuda · Pendiente de verificación</span>.
-        </div>
+      {/* ── RedAyuda notice ────────────────────────────────────────────── */}
+      <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
+        <p className="text-xs text-amber-800">
+          <span className="font-bold">Datos RedAyuda:</span> Información de la Red Humanitaria Federada, utilizada con autorización para la localización de personas durante la emergencia.
+          Aparece marcada como <span className="font-semibold">Fuente: RedAyuda · Pendiente de verificación</span>.
+        </p>
       </div>
 
-      {/* Loading */}
+      {/* ── Loading skeleton ───────────────────────────────────────────── */}
       {fetchStatus === "loading" && (
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
@@ -324,7 +355,7 @@ export default function PersonasPage() {
         </div>
       )}
 
-      {/* Error */}
+      {/* ── Error ──────────────────────────────────────────────────────── */}
       {fetchStatus === "error" && (
         <div className="card p-6 text-center space-y-3">
           <p className="font-semibold text-slate-700">No pudimos conectar con el servidor.</p>
@@ -332,7 +363,7 @@ export default function PersonasPage() {
         </div>
       )}
 
-      {/* Empty */}
+      {/* ── Empty ──────────────────────────────────────────────────────── */}
       {fetchStatus === "empty" && (
         <div className="card p-6 space-y-4">
           <p className="font-semibold text-slate-700">No encontramos registros con esos filtros.</p>
@@ -353,11 +384,12 @@ export default function PersonasPage() {
         </div>
       )}
 
-      {/* Results */}
+      {/* ── Results ────────────────────────────────────────────────────── */}
       {fetchStatus === "success" && rows.length > 0 && (
         <>
           <p className="text-xs text-slate-500">
-            Mostrando {rows.length.toLocaleString("es-VE")} de {fmtTotal(meta.total)} registros
+            Mostrando {rows.length.toLocaleString("es-VE")}
+            {meta.total != null ? ` de ${fmtN(meta.total)} registros` : " registros"}
           </p>
 
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -366,8 +398,8 @@ export default function PersonasPage() {
             ))}
           </div>
 
-          {/* Load more */}
-          {meta.page < meta.pages && (
+          {/* Ver más */}
+          {hasMore && (
             <div className="text-center">
               <button
                 onClick={handleLoadMore}
@@ -379,7 +411,12 @@ export default function PersonasPage() {
                 ) : (
                   <ChevronDown size={16} />
                 )}
-                {loadingMore ? "Cargando…" : `Ver más (${fmtTotal(meta.total - rows.length)} restantes)`}
+                {loadingMore
+                  ? "Cargando…"
+                  : meta.total != null
+                    ? `Ver más (${fmtN(meta.total - rows.length)} restantes)`
+                    : "Ver más"
+                }
               </button>
             </div>
           )}

@@ -1211,16 +1211,19 @@ export const publicController = {
   }),
 
   listPublicPersons: asyncHandler(async (req, res) => {
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 50));
-    const skip = (page - 1) * limit;
-    const typeParam = req.query.type;
-    const types = typeParam ? [typeParam] : familySearchTypes;
-    const q = req.query.q ? String(req.query.q).trim() : null;
-    const stateQ = req.query.state ? String(req.query.state).trim() : null;
+    const page  = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit || req.query.take) || 50));
+    const skip  = (page - 1) * limit;
+    // counts=false skips expensive COUNT + GROUP BY (used by load-more requests)
+    const skipCounts = req.query.counts === "false";
+
+    const typeParam    = req.query.type;
+    const types        = typeParam ? [typeParam] : familySearchTypes;
+    const q            = req.query.q ? String(req.query.q).trim() : null;
+    const stateQ       = req.query.state ? String(req.query.state).trim() : null;
     const municipalityQ = req.query.municipality ? String(req.query.municipality).trim() : null;
-    const sourceQ = req.query.source ? String(req.query.source).trim() : null;
-    const documentQ = req.query.cedula || req.query.documentNumber || req.query.phone;
+    const sourceQ      = req.query.source ? String(req.query.source).trim() : null;
+    const documentQ    = req.query.cedula || req.query.documentNumber || req.query.phone;
 
     const where = {
       deletedAt: null,
@@ -1259,31 +1262,36 @@ export const publicController = {
       ],
     };
 
-    const [total, typeCounts, records] = await Promise.all([
-      prisma.importedHumanitarianRecord.count({ where }),
-      prisma.importedHumanitarianRecord.groupBy({
-        by: ["recordType"],
-        where,
-        _count: { recordType: true },
-      }),
-      prisma.importedHumanitarianRecord.findMany({
-        where,
-        orderBy: { capturedAt: "desc" },
-        skip,
-        take: limit,
-      }),
-    ]);
+    let total = null, byType = null, records;
 
-    const data = records.map(buildRedayudaPublicResult).filter(Boolean);
-    const byType = Object.fromEntries(typeCounts.map(t => [t.recordType, t._count.recordType]));
+    if (skipCounts) {
+      // Load-more path: only fetch the page, skip expensive aggregations
+      records = await prisma.importedHumanitarianRecord.findMany({
+        where, orderBy: { capturedAt: "desc" }, skip, take: limit,
+      });
+    } else {
+      // First-page path: fetch page + counts in parallel
+      const [cnt, grp, recs] = await Promise.all([
+        prisma.importedHumanitarianRecord.count({ where }),
+        prisma.importedHumanitarianRecord.groupBy({
+          by: ["recordType"], where, _count: { recordType: true },
+        }),
+        prisma.importedHumanitarianRecord.findMany({
+          where, orderBy: { capturedAt: "desc" }, skip, take: limit,
+        }),
+      ]);
+      total   = cnt;
+      byType  = Object.fromEntries(grp.map(t => [t.recordType, t._count.recordType]));
+      records = recs;
+    }
 
     res.json({
-      data,
+      data: records.map(buildRedayudaPublicResult).filter(Boolean),
       meta: {
         total,
         page,
         limit,
-        pages: Math.ceil(total / limit),
+        pages: total !== null ? Math.ceil(total / limit) : null,
         byType,
       },
     });

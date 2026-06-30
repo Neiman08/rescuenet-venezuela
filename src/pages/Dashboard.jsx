@@ -62,7 +62,7 @@ export default function Dashboard() {
             <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mt-8">
               <ActionCard to="/reportar" color="red" title="Reportar emergencia" subtitle="Necesito ayuda urgente" icon={<Siren />} />
               <ActionCard to="/estoy-a-salvo" color="green" title="Estoy a salvo" subtitle="Informar a mi familia" icon={<CheckCircle />} />
-              <ActionCard to="/buscar-familiar" color="blue" title="Buscar familiar" subtitle="Buscar persona" icon={<Users />} />
+              <ActionCard to="/personas" color="blue" title="Buscar familiar" subtitle="Buscar persona" icon={<Users />} />
               <ActionCard to="/centros" color="purple" title="Centros de ayuda" subtitle="Refugios y hospitales" icon={<Building2 />} />
             </div>
           </div>
