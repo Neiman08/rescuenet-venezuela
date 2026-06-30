@@ -1316,21 +1316,22 @@ export const publicController = {
         byType  = cached.byType;
         records = await prisma.importedHumanitarianRecord.findMany(findOpts);
       } else {
-        // Cache miss: return records immediately while populating cache in background.
-        // The first response has total=null (frontend shows "Cargando..."); all subsequent
-        // requests within 30 min return the cached count and are instant.
+        // Cache miss: return records immediately; populate count cache in background.
+        // Run COUNT then GROUP BY sequentially (1 connection at a time) to avoid pool
+        // exhaustion when multiple requests trigger background queries concurrently.
         records = await prisma.importedHumanitarianRecord.findMany(findOpts);
-        Promise.all([
-          prisma.importedHumanitarianRecord.count({ where }),
-          prisma.importedHumanitarianRecord.groupBy({
-            by: ["recordType"], where, _count: { recordType: true },
-          }),
-        ]).then(([cnt, grp]) => {
-          _setCountCache(cacheKey, {
-            total: cnt,
-            byType: Object.fromEntries(grp.map(t => [t.recordType, t._count.recordType])),
-          });
-        }).catch(() => {}); // background — don't fail the request
+        (async () => {
+          try {
+            const cnt = await prisma.importedHumanitarianRecord.count({ where });
+            const grp = await prisma.importedHumanitarianRecord.groupBy({
+              by: ["recordType"], where, _count: { recordType: true },
+            });
+            _setCountCache(cacheKey, {
+              total: cnt,
+              byType: Object.fromEntries(grp.map(t => [t.recordType, t._count.recordType])),
+            });
+          } catch {} // background — don't fail the request
+        })();
       }
     }
 
