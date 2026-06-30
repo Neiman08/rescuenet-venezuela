@@ -1245,23 +1245,36 @@ export const publicController = {
     const municipalityQ = req.query.municipality ? String(req.query.municipality).trim() : null;
     const sourceQ      = req.query.source ? String(req.query.source).trim() : null;
     const documentQ    = req.query.cedula || req.query.documentNumber || req.query.phone;
-    // ?cedula= uses exact JSON-path equality so the expression index on (documentPrivate->>'cedula') can be used.
-    // ?documentNumber= / ?phone= fall back to string_contains for partial matching.
+    // ?cedula= fast path: raw SQL uses (documentPrivate->>'cedula') which matches the
+    // expression index directly, bypassing Prisma's #> operator that doesn't match the index.
     const isCedulaExact = !!req.query.cedula && !req.query.documentNumber && !req.query.phone;
+
+    // For exact cedula lookups, resolve IDs via raw SQL that uses the expression index,
+    // then filter the main query with id IN (...). This avoids the 16s full scan.
+    let cedulaIdFilter = null;
+    if (isCedulaExact && documentQ) {
+      const cedula = normalizeDocument(documentQ);
+      const rows = await prisma.$queryRaw`
+        SELECT id FROM "ImportedHumanitarianRecord"
+        WHERE ("documentPrivate"->>'cedula') = ${cedula}
+           OR "contactPrivate" = ${cedula}
+        LIMIT 20
+      `;
+      cedulaIdFilter = rows.map(r => r.id);
+    }
 
     const where = {
       deletedAt: null,
       recordType: { in: types },
+      ...(cedulaIdFilter ? { id: { in: cedulaIdFilter } } : {}),
       AND: [
         { OR: [{ verificationStatus: "APROBADO" }, { sourceName: REDAYUDA_SOURCE }] },
         ...(sourceQ ? [{ sourceName: { contains: sourceQ, mode: "insensitive" } }] : []),
-        ...(documentQ ? [{
-          OR: isCedulaExact
-            ? [{ documentPrivate: { path: ["cedula"], equals: normalizeDocument(documentQ) } }]
-            : [
-                { documentPrivate: { path: ["cedula"], string_contains: normalizeDocument(documentQ) } },
-                { contactPrivate: { contains: normalizeDocument(documentQ) } },
-              ],
+        ...(!cedulaIdFilter && documentQ ? [{
+          OR: [
+            { documentPrivate: { path: ["cedula"], string_contains: normalizeDocument(documentQ) } },
+            { contactPrivate: { contains: normalizeDocument(documentQ) } },
+          ],
         }] : []),
         // Only search name columns — both have GIN trigram indexes.
         // Unindexed ILIKE on description/hospitalName/zone would force a full 189k-row scan.
