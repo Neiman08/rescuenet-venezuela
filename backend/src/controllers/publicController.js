@@ -1243,8 +1243,15 @@ export const publicController = {
             { lastSeenPlace: { contains: q, mode: "insensitive" } },
           ],
         }] : []),
-        ...(stateQ ? [{ OR: [{ state: { contains: stateQ, mode: "insensitive" } }] }] : []),
-        ...(municipalityQ ? [{ OR: [{ municipality: { contains: municipalityQ, mode: "insensitive" } }] }] : []),
+        ...(stateQ ? [{ OR: [
+          { state: { contains: stateQ, mode: "insensitive" } },
+          { zone: { contains: stateQ, mode: "insensitive" } },
+          { municipality: { contains: stateQ, mode: "insensitive" } },
+        ] }] : []),
+        ...(municipalityQ ? [{ OR: [
+          { municipality: { contains: municipalityQ, mode: "insensitive" } },
+          { zone: { contains: municipalityQ, mode: "insensitive" } },
+        ] }] : []),
       ],
     };
 
