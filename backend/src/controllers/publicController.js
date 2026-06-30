@@ -1254,10 +1254,12 @@ export const publicController = {
     let cedulaIdFilter = null;
     if (isCedulaExact && documentQ) {
       const cedula = normalizeDocument(documentQ);
+      // Use the expression index on (documentPrivate->>'cedula') directly.
+      // Keeping this as a single-condition query so PostgreSQL can use the index
+      // (an OR with unindexed columns forces a full scan even if one branch is indexed).
       const rows = await prisma.$queryRaw`
         SELECT id FROM "ImportedHumanitarianRecord"
         WHERE ("documentPrivate"->>'cedula') = ${cedula}
-           OR "contactPrivate" = ${cedula}
         LIMIT 20
       `;
       cedulaIdFilter = rows.map(r => r.id);
