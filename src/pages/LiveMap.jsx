@@ -6,6 +6,14 @@ import StatusBadge from "../components/StatusBadge";
 import { noApprovedDataMessage, noRealDataMessage } from "../config/demoData";
 import { publicApi } from "../lib/api";
 
+const VZ_STATES = [
+  "Amazonas", "Anzoátegui", "Apure", "Aragua", "Barinas", "Bolívar",
+  "Carabobo", "Cojedes", "Delta Amacuro", "Distrito Capital", "Falcón",
+  "Guárico", "La Guaira", "Lara", "Mérida", "Miranda", "Monagas",
+  "Nueva Esparta", "Portuguesa", "Sucre", "Táchira", "Trujillo",
+  "Yaracuy", "Zulia",
+];
+
 function mapCenterType(recordType) {
   const labels = {
     hospital: ["Hospital", "blue"],
@@ -25,12 +33,14 @@ export default function LiveMap() {
   const [zones, setZones] = useState([]);
   const [reports, setReports] = useState([]);
   const [status, setStatus] = useState("loading");
+  const [selectedState, setSelectedState] = useState("");
   const [includeInternational, setIncludeInternational] = useState(false);
   const [internationalCount, setInternationalCount] = useState(0);
 
   useEffect(() => {
     setStatus("loading");
-    publicApi.getMap({ includeInternational })
+    // When a specific state is selected, never mix international centers
+    publicApi.getMap({ includeInternational: selectedState ? false : includeInternational, state: selectedState })
       .then((payload) => {
         const nextZones = payload?.zones || [];
         setInternationalCount(payload?.internationalCentersCount || 0);
@@ -52,7 +62,7 @@ export default function LiveMap() {
         setReports([]);
         setStatus("error");
       });
-  }, [includeInternational]);
+  }, [includeInternational, selectedState]);
 
   return (
     <div className="space-y-6">
@@ -63,6 +73,17 @@ export default function LiveMap() {
       <div className="grid xl:grid-cols-[320px_1fr] gap-6">
         <aside className="card p-5 space-y-4">
           <h2 className="font-black text-lg">Filtros</h2>
+          <div>
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Estado</label>
+            <select
+              className="input w-full"
+              value={selectedState}
+              onChange={(e) => setSelectedState(e.target.value)}
+            >
+              <option value="">Todos los estados</option>
+              {VZ_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
           <select className="input"><option>Todos los reportes</option><option>Emergencias criticas</option><option>Refugios</option><option>Hospitales</option></select>
           <select className="input"><option>Todas las prioridades</option><option>Critica</option><option>Alta</option><option>Media</option></select>
           <div className="space-y-3">
@@ -89,14 +110,17 @@ export default function LiveMap() {
                 <span className="text-xs text-slate-500">{layer.status}</span>
               </label>
             ))}
-            <label className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm cursor-pointer">
+            <label className={`flex items-center gap-3 p-3 rounded-xl border text-sm transition-opacity ${selectedState ? "bg-slate-50 border-slate-200 opacity-50 cursor-not-allowed" : "bg-amber-50 border-amber-200 cursor-pointer"}`}>
               <input
                 type="checkbox"
-                checked={includeInternational}
-                onChange={(e) => setIncludeInternational(e.target.checked)}
+                checked={!selectedState && includeInternational}
+                disabled={!!selectedState}
+                onChange={(e) => { if (!selectedState) setIncludeInternational(e.target.checked); }}
               />
               <span className="font-semibold flex-1">Centros internacionales</span>
-              <span className="text-xs text-amber-600 font-medium">{internationalCount} diaspora</span>
+              <span className={`text-xs font-medium ${selectedState ? "text-slate-400" : "text-amber-600"}`}>
+                {selectedState ? "Selecciona todos" : `${internationalCount} diaspora`}
+              </span>
             </label>
           </div>
         </aside>

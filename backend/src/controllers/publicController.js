@@ -160,6 +160,17 @@ function normalizePublicText(value) {
     .trim();
 }
 
+// State aliases: old names \u2192 current official name
+const STATE_ALIASES = { vargas: "la guaira" };
+function normalizeState(str) {
+  const base = String(str || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+  return STATE_ALIASES[base] ?? base;
+}
+
 const publicHeaderPersonNames = new Set([
   "nombre",
   "nombre y apellido",
@@ -270,32 +281,40 @@ function buildPublicRecord(record) {
   return safePublicRecord;
 }
 
-async function approvedImportedRecords(recordTypes, take = 500) {
+async function approvedImportedRecords(recordTypes, take = 500, stateFilter = null) {
   try {
+    const normFilter = stateFilter ? normalizeState(stateFilter) : null;
     const records = await prisma.importedHumanitarianRecord.findMany({
       where: { deletedAt: null, verificationStatus: "APROBADO", recordType: { in: recordTypes } },
       orderBy: { capturedAt: "desc" },
-      take,
+      // Remove take limit when filtering by state to ensure all matching records are returned
+      ...(normFilter ? {} : { take }),
     });
-    return records.map(buildPublicRecord).filter(Boolean).map(stripInternalPublicFields);
+    const filtered = normFilter
+      ? records.filter(r => normalizeState(r.publicSafe?.state ?? "") === normFilter)
+      : records;
+    return filtered.map(buildPublicRecord).filter(Boolean).map(stripInternalPublicFields);
   } catch {
     return [];
   }
 }
 
 // Variant that tags centers as _isInternational before stripping coords
-async function approvedImportedRecordsWithRaw(recordTypes, take = 1000) {
+async function approvedImportedRecordsWithRaw(recordTypes, take = 1000, stateFilter = null) {
   try {
+    const normFilter = stateFilter ? normalizeState(stateFilter) : null;
     const records = await prisma.importedHumanitarianRecord.findMany({
       where: { deletedAt: null, verificationStatus: "APROBADO", recordType: { in: recordTypes } },
       orderBy: { capturedAt: "desc" },
-      take,
+      ...(normFilter ? {} : { take }),
     });
-    return records
+    const filtered = normFilter
+      ? records.filter(r => normalizeState(r.publicSafe?.state ?? "") === normFilter)
+      : records;
+    return filtered
       .map((record) => {
         const built = buildPublicRecord(record);
         if (!built) return null;
-        // Tag before coords are stripped
         return { ...built, _isInternational: isInternationalCenter(record) };
       })
       .filter(Boolean)
@@ -777,22 +796,30 @@ export const publicController = {
 
   publicMap: asyncHandler(async (req, res) => {
     const includeInternational = req.query.includeInternational === "true";
+    const stateFilter = req.query.state ? String(req.query.state).trim() : null;
+    const normFilter = stateFilter ? normalizeState(stateFilter) : null;
+
     const map = await MapService.liveMap();
     const hospitals = map.hospitals
       .filter(isInAffectedOperationalZone)
+      .filter(r => !normFilter || normalizeState(r.affectedZone?.state ?? "") === normFilter)
       .map(PublicDataSanitizer.hospital)
       .map((record) => withOperationalClassification(record, "hospital"))
       .filter(Boolean);
     const shelters = map.shelters
       .filter(isInAffectedOperationalZone)
+      .filter(r => !normFilter || normalizeState(r.affectedZone?.state ?? "") === normFilter)
       .map(PublicDataSanitizer.shelter)
       .map((record) => withOperationalClassification(record, "shelter"))
       .filter(Boolean);
     const importedPeople = await approvedImportedRecords(familySearchTypes, 500);
-    const allCenters = await approvedImportedRecordsWithRaw(publicCenterTypes);
+    const allCenters = await approvedImportedRecordsWithRaw(publicCenterTypes, 1000, stateFilter);
     const localCenters = allCenters.filter((c) => !c._isInternational).map(({ _isInternational, ...r }) => r);
     const internationalCenters = allCenters.filter((c) => c._isInternational).map(({ _isInternational, ...r }) => ({ ...r, isInternational: true }));
-    const helpCenters = includeInternational ? [...localCenters, ...internationalCenters] : localCenters;
+    // Never mix international centers with a specific-state filter
+    const helpCenters = (includeInternational && !stateFilter)
+      ? [...localCenters, ...internationalCenters]
+      : localCenters;
     res.json({
       zones: affectedOperationalZones.map(publicOperationalZone),
       reports: [
@@ -803,6 +830,7 @@ export const publicController = {
       hospitals,
       helpCenters,
       internationalCentersCount: internationalCenters.length,
+      ...(stateFilter ? { filteredByState: stateFilter } : {}),
     });
   }),
 
@@ -829,25 +857,29 @@ export const publicController = {
     res.json({ data: records.map(PublicDataSanitizer.donation) });
   }),
 
-  helpCenters: asyncHandler(async (_req, res) => {
+  helpCenters: asyncHandler(async (req, res) => {
+    const stateFilter = req.query.state ? String(req.query.state).trim() : null;
+    const normFilter = stateFilter ? normalizeState(stateFilter) : null;
     const [hospitals, shelters] = await Promise.all([
       prisma.hospital.findMany({ where: { deletedAt: null }, include: { affectedZone: true }, take: 100 }),
       prisma.shelter.findMany({ where: { deletedAt: null }, include: { affectedZone: true }, take: 100 }),
     ]);
     const publicHospitals = hospitals
       .filter(isInAffectedOperationalZone)
+      .filter(r => !normFilter || normalizeState(r.affectedZone?.state ?? "") === normFilter)
       .map(PublicDataSanitizer.hospital)
       .map((record) => withOperationalClassification(record, "hospital"))
       .filter(Boolean);
     const publicShelters = shelters
       .filter(isInAffectedOperationalZone)
+      .filter(r => !normFilter || normalizeState(r.affectedZone?.state ?? "") === normFilter)
       .map(PublicDataSanitizer.shelter)
       .map((record) => withOperationalClassification(record, "shelter"))
       .filter(Boolean);
     res.json({
       hospitals: publicHospitals,
       shelters: publicShelters,
-      imported: await approvedImportedRecords(publicCenterTypes),
+      imported: await approvedImportedRecords(publicCenterTypes, 500, stateFilter),
     });
   }),
 

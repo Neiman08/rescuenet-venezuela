@@ -52,10 +52,19 @@ export const publicApi = {
   getMissingReports: () => request("/missing/public"),
   getRescued: () => request("/rescued/public"),
   getHospitalized: () => request("/hospitalized/public"),
-  getMap: ({ includeInternational = false } = {}) => request(`/map/public${includeInternational ? "?includeInternational=true" : ""}`),
+  getMap: ({ includeInternational = false, state = "" } = {}) => {
+    const params = new URLSearchParams();
+    if (includeInternational) params.set("includeInternational", "true");
+    if (state) params.set("state", state);
+    const qs = params.toString();
+    return request(`/map/public${qs ? `?${qs}` : ""}`);
+  },
   getDashboard: () => request("/dashboard/public"),
   getAffectedZones: () => request("/affected-zones/public"),
-  getHelpCenters: () => request("/help-centers/public"),
+  getHelpCenters: ({ state = "" } = {}) => {
+    const qs = state ? `?state=${encodeURIComponent(state)}` : "";
+    return request(`/help-centers/public${qs}`);
+  },
   getHospitals: () => request("/hospitals/public"),
   getShelters: () => request("/shelters/public"),
   getDonations: () => request("/donations/public"),

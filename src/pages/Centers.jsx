@@ -25,6 +25,23 @@ const initialCenterForm = {
   observations: "",
 };
 
+const VZ_STATES = [
+  "Amazonas", "Anzoátegui", "Apure", "Aragua", "Barinas", "Bolívar",
+  "Carabobo", "Cojedes", "Delta Amacuro", "Distrito Capital", "Falcón",
+  "Guárico", "La Guaira", "Lara", "Mérida", "Miranda", "Monagas",
+  "Nueva Esparta", "Portuguesa", "Sucre", "Táchira", "Trujillo",
+  "Yaracuy", "Zulia",
+];
+
+function normalizeState(str) {
+  const base = String(str || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+  return base === "vargas" ? "la guaira" : base;
+}
+
 export default function Centers() {
   const [rows, setRows] = useState([]);
   const [status, setStatus] = useState("loading");
@@ -86,14 +103,13 @@ export default function Centers() {
   }
 
   const countries = [...new Set(rows.map((row) => row.country).filter(Boolean))];
-  const states = [...new Set(rows.map((row) => row.state).filter(Boolean))];
   const municipalities = [...new Set(rows.map((row) => row.municipality).filter(Boolean))];
   const types = [...new Set(rows.map((row) => row.type).filter(Boolean))];
   const operationalStatuses = [...new Set(rows.map((row) => row.operationalStatus || row.status).filter(Boolean))];
   const filteredRows = rows.filter((row) => {
     const itemText = (row.acceptedItems || []).join(" ").toLowerCase();
     return (!filters.country || row.country === filters.country)
-      && (!filters.state || row.state === filters.state)
+      && (!filters.state || normalizeState(row.state) === normalizeState(filters.state))
       && (!filters.municipality || row.municipality === filters.municipality)
       && (!filters.type || row.type === filters.type || itemText.includes(filters.type.toLowerCase()))
       && (!filters.operationalStatus || (row.operationalStatus || row.status) === filters.operationalStatus)
@@ -154,7 +170,7 @@ export default function Centers() {
         </select>
         <select className="input" name="state" value={filters.state} onChange={updateFilter}>
           <option value="">Todos los estados</option>
-          {states.map((state) => <option key={state} value={state}>{state}</option>)}
+          {VZ_STATES.map((state) => <option key={state} value={state}>{state}</option>)}
         </select>
         <select className="input" name="municipality" value={filters.municipality} onChange={updateFilter}>
           <option value="">Todos los municipios</option>
