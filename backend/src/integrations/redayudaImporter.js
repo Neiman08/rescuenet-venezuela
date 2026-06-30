@@ -82,7 +82,9 @@ const PHONE_PREFIX = /(?:tel[eé]fono|tel\.?|contactar?\s+al?|llam[ae]\s+al?|wha
 // 2. Palabra completa "cedula" + número (puede tener puntos como sep. de miles): cedula:25.964.449
 // 3. Abreviatura estricta "C.I." (ambos puntos obligatorios) + número: C.I. 12345678
 const CEDULA_PREFIX_PATTERN = /\b[VEJPGvejpg]-?\d{6,9}\b/g;
-const CEDULA_BARE_PATTERN = /(?:\bcedula(?:\s+de\s+identidad)?\s*:?\s*[\d.,\-]{5,15}|\bc\.i\.\s*:?\s*[\d.,\-]{5,15})/gi;
+// Allow up to 8 non-digit chars between "cedula" and the number to catch
+// constructions like "cedula es V-23.152.490" or "cedula de: 12345678"
+const CEDULA_BARE_PATTERN = /(?:\bcedula(?:\s+de\s+identidad)?[^\d\n]{0,8}[\d.,\-]{5,15}|\bc\.i\.\s*:?\s*[\d.,\-]{5,15})/gi;
 
 function sanitizePublicText(text) {
   if (!text) return undefined;
