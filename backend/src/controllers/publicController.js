@@ -282,12 +282,16 @@ function buildPublicRecord(record) {
 }
 
 // Build a rich public result for Redayuda records (and fallback for APROBADO records).
-// For restricted/private_only: masks name, hides cedula/phone/description.
+// Redayuda: full disclosure per humanitarian authorization — no masking regardless of privacyLevel.
+// Non-Redayuda restricted/private_only records: mask name, hide cedula/phone/description.
 function buildRedayudaPublicResult(record) {
   const pub = record.publicSafe || {};
   const isRedayuda = record.sourceName === REDAYUDA_SOURCE;
-  const isRestricted = ["restricted", "private_only"].includes(record.privacyLevel);
-  const displayName = isRestricted ? "Informacion protegida" : (pub.fullName || record.fullName);
+  // Redayuda has humanitarian authorization: never restrict name or sensitive fields.
+  const isRestricted = !isRedayuda && ["restricted", "private_only"].includes(record.privacyLevel);
+  // Use the top-level fullName first — for Redayuda restricted records publicSafe.fullName
+  // was set to "Informacion protegida" during import, but record.fullName holds the real name.
+  const displayName = isRestricted ? "Informacion protegida" : (record.fullName || pub.fullName);
   return {
     id: record.id,
     type: record.recordType,
@@ -299,31 +303,31 @@ function buildRedayudaPublicResult(record) {
     privacyLevel: record.privacyLevel,
     capturedAt: record.capturedAt,
     updatedAt: record.updatedAt,
-    // Person
+    // Person — prefer top-level fields (more complete for restricted records)
     fullName: displayName,
     name: displayName,
-    approximateAge: pub.approximateAge || record.approximateAge,
-    age: pub.approximateAge || record.approximateAge,
-    gender: pub.gender || record.gender,
-    sex: pub.gender || record.gender,
+    approximateAge: record.approximateAge || pub.approximateAge,
+    age: record.approximateAge || pub.approximateAge,
+    gender: record.gender || pub.gender,
+    sex: record.gender || pub.gender,
     status: pub.status || record.status,
-    // Location
-    state: pub.state || record.state,
-    municipality: pub.municipality || record.municipality,
-    zone: pub.zone || record.zone,
-    publicLocation: pub.currentPlace || pub.lastSeenPlace || pub.zone || record.zone || record.currentPlace,
-    lastSeenPlace: pub.lastSeenPlace || record.lastSeenPlace,
-    currentPlace: pub.currentPlace || record.currentPlace,
+    // Location — top-level fields carry the data for restricted records
+    state: record.state || pub.state,
+    municipality: record.municipality || pub.municipality,
+    zone: record.zone || pub.zone,
+    publicLocation: record.currentPlace || record.lastSeenPlace || record.zone || pub.currentPlace || pub.lastSeenPlace || pub.zone,
+    lastSeenPlace: record.lastSeenPlace || pub.lastSeenPlace,
+    currentPlace: record.currentPlace || pub.currentPlace,
     // Medical/institution
-    hospital: pub.hospitalName || record.hospitalName,
-    hospitalName: pub.hospitalName || record.hospitalName,
+    hospital: record.hospitalName || pub.hospitalName,
+    hospitalName: record.hospitalName || pub.hospitalName,
     // Content
-    description: isRestricted ? undefined : (pub.description || record.description),
+    description: isRestricted ? undefined : (record.description || pub.description),
     photoUrl: pub.photoUrl,
     tags: pub.tags,
-    // Sensitive: exposed only for standard Redayuda records (humanitarian authorization)
-    cedula: (isRedayuda && !isRestricted) ? record.documentPrivate?.cedula : undefined,
-    phone: (isRedayuda && !isRestricted && record.contactPrivate) ? record.contactPrivate : undefined,
+    // Sensitive: Redayuda records expose cedula and phone (humanitarian authorization)
+    cedula: isRedayuda ? (record.documentPrivate?.cedula || undefined) : undefined,
+    phone: (isRedayuda && record.contactPrivate) ? record.contactPrivate : undefined,
   };
 }
 
