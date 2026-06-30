@@ -281,6 +281,75 @@ function buildPublicRecord(record) {
   return safePublicRecord;
 }
 
+// Build a rich public result for Redayuda records (and fallback for APROBADO records).
+// For restricted/private_only: masks name, hides cedula/phone/description.
+function buildRedayudaPublicResult(record) {
+  const pub = record.publicSafe || {};
+  const isRedayuda = record.sourceName === REDAYUDA_SOURCE;
+  const isRestricted = ["restricted", "private_only"].includes(record.privacyLevel);
+  const displayName = isRestricted ? "Informacion protegida" : (pub.fullName || record.fullName);
+  return {
+    id: record.id,
+    type: record.recordType,
+    recordType: record.recordType,
+    sourceName: pub.sourceName || record.sourceName,
+    source: isRedayuda ? "Redayuda" : (pub.sourceName || record.sourceName),
+    isRedayuda,
+    verificationStatus: record.verificationStatus,
+    privacyLevel: record.privacyLevel,
+    capturedAt: record.capturedAt,
+    updatedAt: record.updatedAt,
+    // Person
+    fullName: displayName,
+    name: displayName,
+    approximateAge: pub.approximateAge || record.approximateAge,
+    age: pub.approximateAge || record.approximateAge,
+    gender: pub.gender || record.gender,
+    sex: pub.gender || record.gender,
+    status: pub.status || record.status,
+    // Location
+    state: pub.state || record.state,
+    municipality: pub.municipality || record.municipality,
+    zone: pub.zone || record.zone,
+    publicLocation: pub.currentPlace || pub.lastSeenPlace || pub.zone || record.zone || record.currentPlace,
+    lastSeenPlace: pub.lastSeenPlace || record.lastSeenPlace,
+    currentPlace: pub.currentPlace || record.currentPlace,
+    // Medical/institution
+    hospital: pub.hospitalName || record.hospitalName,
+    hospitalName: pub.hospitalName || record.hospitalName,
+    // Content
+    description: isRestricted ? undefined : (pub.description || record.description),
+    photoUrl: pub.photoUrl,
+    tags: pub.tags,
+    // Sensitive: exposed only for standard Redayuda records (humanitarian authorization)
+    cedula: (isRedayuda && !isRestricted) ? record.documentPrivate?.cedula : undefined,
+    phone: (isRedayuda && !isRestricted && record.contactPrivate) ? record.contactPrivate : undefined,
+  };
+}
+
+// Like approvedImportedRecords but also includes NO_VERIFICADO records from Redayuda.
+// Used for person-type endpoints (missing, hospitalized, safe).
+async function publicPersonRecords(recordTypes, take = 300, stateFilter = null) {
+  try {
+    const normFilter = stateFilter ? normalizeState(stateFilter) : null;
+    const records = await prisma.importedHumanitarianRecord.findMany({
+      where: {
+        deletedAt: null,
+        recordType: { in: recordTypes },
+        AND: [{ OR: [{ verificationStatus: "APROBADO" }, { sourceName: REDAYUDA_SOURCE }] }],
+      },
+      orderBy: { capturedAt: "desc" },
+      ...(normFilter ? {} : { take }),
+    });
+    const filtered = normFilter
+      ? records.filter(r => normalizeState(r.publicSafe?.state ?? r.state ?? "") === normFilter)
+      : records;
+    return filtered.map(buildRedayudaPublicResult).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 async function approvedImportedRecords(recordTypes, take = 500, stateFilter = null) {
   try {
     const normFilter = stateFilter ? normalizeState(stateFilter) : null;
@@ -323,6 +392,8 @@ async function approvedImportedRecordsWithRaw(recordTypes, take = 1000, stateFil
     return [];
   }
 }
+
+const REDAYUDA_SOURCE = "redayuda";
 
 const publicCenterTypes = ["collection_center", "shelter", "hospital", "help_center", "water_point", "food_point", "medical_point", "volunteer_center", "pet_aid_center", "logistics_center", "donation_need"];
 const familySearchTypes = ["missing_person", "hospitalized_person", "trapped_person", "safe_person", "rescued_person", "deceased_person"];
@@ -586,7 +657,7 @@ export const publicController = {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
-    const imported = await approvedImportedRecords(["safe_person"]);
+    const imported = await publicPersonRecords(["safe_person"], 300);
     res.json({ data: [...records.map(PublicDataSanitizer.safeReport), ...imported] });
   }),
 
@@ -619,7 +690,7 @@ export const publicController = {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
-    const imported = await approvedImportedRecords(["missing_person"]);
+    const imported = await publicPersonRecords(["missing_person"], 300);
     res.json({ data: [...records.map(PublicDataSanitizer.missing), ...imported] });
   }),
 
@@ -704,7 +775,7 @@ export const publicController = {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
-    const imported = await approvedImportedRecords(["hospitalized_person"]);
+    const imported = await publicPersonRecords(["hospitalized_person"], 300);
     res.json({
       data: [
         ...records.map((record) => familyResult({
@@ -977,8 +1048,10 @@ export const publicController = {
     const municipality = containsFilter(req.query.municipality);
     const hospital = containsFilter(req.query.hospital);
     const status = containsFilter(req.query.status);
-    const documentQuery = req.query.documentNumber || req.query.cedula || req.query.documentId || req.query.passport;
-    const take = Math.min(Number(req.query.take) || 100, 200);
+    const documentQuery = req.query.documentNumber || req.query.cedula || req.query.documentId || req.query.passport || req.query.phone || req.query.telefono;
+    const take = Math.min(Number(req.query.take) || 200, 500);
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const skip = (page - 1) * take;
 
     const zoneFilter = affectedZoneFilter(state, municipality);
 
@@ -992,7 +1065,7 @@ export const publicController = {
         },
         include: { affectedZone: true },
         orderBy: { createdAt: "desc" },
-        take,
+        take: 100,
       }),
       documentQuery ? Promise.resolve([]) : prisma.safeReport.findMany({
         where: {
@@ -1003,7 +1076,7 @@ export const publicController = {
         },
         include: { affectedZone: true },
         orderBy: { createdAt: "desc" },
-        take,
+        take: 100,
       }),
       documentQuery ? Promise.resolve([]) : prisma.rescuedPerson.findMany({
         where: {
@@ -1015,7 +1088,7 @@ export const publicController = {
         },
         include: { affectedZone: true, hospital: true, shelter: true },
         orderBy: { createdAt: "desc" },
-        take,
+        take: 100,
       }),
       documentQuery ? Promise.resolve([]) : prisma.hospitalAdmission.findMany({
         where: {
@@ -1028,21 +1101,42 @@ export const publicController = {
           ...(status ? { patientStatus: status } : {}),
         },
         orderBy: { createdAt: "desc" },
-        take,
+        take: 100,
       }),
       prisma.importedHumanitarianRecord.findMany({
         where: {
           deletedAt: null,
-          verificationStatus: "APROBADO",
           recordType: { in: familySearchTypes },
-          ...(q ? { OR: [{ fullName: containsFilter(q) }, { name: containsFilter(q) }, { description: containsFilter(q) }, { hospitalName: containsFilter(q) }, { zone: containsFilter(q) }] } : {}),
+          AND: [
+            { OR: [{ verificationStatus: "APROBADO" }, { sourceName: REDAYUDA_SOURCE }] },
+            ...(documentQuery ? [{
+              OR: [
+                { documentPrivate: { path: ["cedula"], string_contains: normalizeDocument(documentQuery) } },
+                { contactPrivate: { contains: normalizeDocument(documentQuery) } },
+              ],
+            }] : []),
+            ...(q ? [{
+              OR: [
+                { fullName: containsFilter(q) },
+                { name: containsFilter(q) },
+                { description: containsFilter(q) },
+                { hospitalName: containsFilter(q) },
+                { zone: containsFilter(q) },
+                { municipality: containsFilter(q) },
+                { state: containsFilter(q) },
+                { currentPlace: containsFilter(q) },
+                { lastSeenPlace: containsFilter(q) },
+              ],
+            }] : []),
+          ],
           ...(state ? { state } : {}),
           ...(municipality ? { municipality } : {}),
           ...(hospital ? { hospitalName: hospital } : {}),
           ...(status ? { status } : {}),
         },
         orderBy: { capturedAt: "desc" },
-        take: documentQuery ? 1000 : take,
+        skip: documentQuery ? 0 : skip,
+        take,
       }),
     ]);
 
@@ -1106,41 +1200,82 @@ export const publicController = {
         privacyLevel: "standard",
         createdAt: record.createdAt,
       })),
-      ...imported.filter((record) => recordDocumentMatches(record, documentQuery)).map((record) => {
-        const repairedPublic = repairLegacyGoogleDriveHospitalizedPublicRecord(
-          normalizeImportedPersonPublicFields(
-            {
-              fullName: record.publicSafe?.fullName || record.fullName,
-              name: record.publicSafe?.name,
-              zone: record.publicSafe?.zone || record.zone,
-              currentPlace: record.publicSafe?.currentPlace || record.currentPlace,
-              lastSeenPlace: record.publicSafe?.lastSeenPlace || record.lastSeenPlace,
-              status: record.publicSafe?.status,
-              state: record.publicSafe?.state,
-              recordType: record.recordType,
-            },
-            record.recordType,
-          ),
-          record.sourceName,
-        );
-        return familyResult({
-          id: record.id,
-          type: record.recordType,
-          name: repairedPublic.fullName || repairedPublic.name || record.publicSafe?.fullName || record.fullName,
-          age: record.publicSafe?.approximateAge || record.approximateAge,
-          sex: record.publicSafe?.gender || record.gender,
-          status: repairedPublic.status || record.publicSafe?.status || record.status,
-          publicLocation: repairedPublic.currentPlace || repairedPublic.lastSeenPlace || repairedPublic.zone || record.zone,
-          hospital: record.publicSafe?.hospitalName || record.hospitalName,
-          source: record.sourceName,
-          privacyLevel: record.privacyLevel,
-          verificationStatus: record.verificationStatus,
-          updatedAt: record.updatedAt,
-        });
-      }),
-    ].slice(0, take);
+      ...imported.map((record) => buildRedayudaPublicResult(record)).filter(Boolean),
+    ];
 
-    res.json({ data: results, meta: { total: results.length } });
+    res.json({ data: results, meta: { total: results.length, page, take } });
+  }),
+
+  listPublicPersons: asyncHandler(async (req, res) => {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 50));
+    const skip = (page - 1) * limit;
+    const typeParam = req.query.type;
+    const types = typeParam ? [typeParam] : familySearchTypes;
+    const q = req.query.q ? String(req.query.q).trim() : null;
+    const stateQ = req.query.state ? String(req.query.state).trim() : null;
+    const municipalityQ = req.query.municipality ? String(req.query.municipality).trim() : null;
+    const sourceQ = req.query.source ? String(req.query.source).trim() : null;
+    const documentQ = req.query.cedula || req.query.documentNumber || req.query.phone;
+
+    const where = {
+      deletedAt: null,
+      recordType: { in: types },
+      AND: [
+        { OR: [{ verificationStatus: "APROBADO" }, { sourceName: REDAYUDA_SOURCE }] },
+        ...(sourceQ ? [{ sourceName: { contains: sourceQ, mode: "insensitive" } }] : []),
+        ...(documentQ ? [{
+          OR: [
+            { documentPrivate: { path: ["cedula"], string_contains: normalizeDocument(documentQ) } },
+            { contactPrivate: { contains: normalizeDocument(documentQ) } },
+          ],
+        }] : []),
+        ...(q ? [{
+          OR: [
+            { fullName: { contains: q, mode: "insensitive" } },
+            { name: { contains: q, mode: "insensitive" } },
+            { description: { contains: q, mode: "insensitive" } },
+            { hospitalName: { contains: q, mode: "insensitive" } },
+            { zone: { contains: q, mode: "insensitive" } },
+            { municipality: { contains: q, mode: "insensitive" } },
+            { state: { contains: q, mode: "insensitive" } },
+            { currentPlace: { contains: q, mode: "insensitive" } },
+            { lastSeenPlace: { contains: q, mode: "insensitive" } },
+          ],
+        }] : []),
+        ...(stateQ ? [{ OR: [{ state: { contains: stateQ, mode: "insensitive" } }] }] : []),
+        ...(municipalityQ ? [{ OR: [{ municipality: { contains: municipalityQ, mode: "insensitive" } }] }] : []),
+      ],
+    };
+
+    const [total, typeCounts, records] = await Promise.all([
+      prisma.importedHumanitarianRecord.count({ where }),
+      prisma.importedHumanitarianRecord.groupBy({
+        by: ["recordType"],
+        where,
+        _count: { recordType: true },
+      }),
+      prisma.importedHumanitarianRecord.findMany({
+        where,
+        orderBy: { capturedAt: "desc" },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    const data = records.map(buildRedayudaPublicResult).filter(Boolean);
+    const byType = Object.fromEntries(typeCounts.map(t => [t.recordType, t._count.recordType]));
+
+    res.json({
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+        byType,
+      },
+    });
   }),
 
   createHospitalizedReport: asyncHandler(async (req, res) => {

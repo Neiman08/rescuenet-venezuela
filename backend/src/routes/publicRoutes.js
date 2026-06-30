@@ -31,5 +31,6 @@ router.get("/help-centers/public", publicController.helpCenters);
 router.post("/help-centers", publicSubmissionRateLimit, antiSpam, validate(publicSchemas.helpCenter), publicController.createHelpCenter);
 router.post("/logistics/public", publicSubmissionRateLimit, antiSpam, validate(publicSchemas.logisticsRequest), publicController.createLogisticsRequest);
 router.get("/family-search/public", publicController.familySearch);
+router.get("/persons/public", publicController.listPublicPersons);
 
 export default router;

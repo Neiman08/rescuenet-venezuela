@@ -73,6 +73,10 @@ export const publicApi = {
     const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined && value !== "")).toString();
     return request(`/family-search/public${query ? `?${query}` : ""}`);
   },
+  listPersons: (params = {}) => {
+    const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined && value !== "")).toString();
+    return request(`/persons/public${query ? `?${query}` : ""}`);
+  },
 };
 
 export const institutionalApi = {
@@ -93,6 +97,12 @@ export const institutionalApi = {
   reviewMissingReport: (id, body) => request(`/admin/citizen-reports/missing/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   reviewEmergencyReport: (id, body) => request(`/admin/citizen-reports/emergency/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   reviewImportedReport: (id, body) => request(`/admin/citizen-reports/imported/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  listRedayudaRecords: (params = {}) => {
+    const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== "")).toString();
+    return request(`/admin/redayuda${query ? `?${query}` : ""}`);
+  },
+  getRedayudaRecord: (id) => request(`/admin/redayuda/${id}`),
+  updateRedayudaRecord: (id, body) => request(`/admin/redayuda/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
 };
 
 export function friendlyApiError(error) {
