@@ -1235,6 +1235,9 @@ export const publicController = {
     const municipalityQ = req.query.municipality ? String(req.query.municipality).trim() : null;
     const sourceQ      = req.query.source ? String(req.query.source).trim() : null;
     const documentQ    = req.query.cedula || req.query.documentNumber || req.query.phone;
+    // ?cedula= uses exact JSON-path equality so the expression index on (documentPrivate->>'cedula') can be used.
+    // ?documentNumber= / ?phone= fall back to string_contains for partial matching.
+    const isCedulaExact = !!req.query.cedula && !req.query.documentNumber && !req.query.phone;
 
     const where = {
       deletedAt: null,
@@ -1243,10 +1246,12 @@ export const publicController = {
         { OR: [{ verificationStatus: "APROBADO" }, { sourceName: REDAYUDA_SOURCE }] },
         ...(sourceQ ? [{ sourceName: { contains: sourceQ, mode: "insensitive" } }] : []),
         ...(documentQ ? [{
-          OR: [
-            { documentPrivate: { path: ["cedula"], string_contains: normalizeDocument(documentQ) } },
-            { contactPrivate: { contains: normalizeDocument(documentQ) } },
-          ],
+          OR: isCedulaExact
+            ? [{ documentPrivate: { path: ["cedula"], equals: normalizeDocument(documentQ) } }]
+            : [
+                { documentPrivate: { path: ["cedula"], string_contains: normalizeDocument(documentQ) } },
+                { contactPrivate: { contains: normalizeDocument(documentQ) } },
+              ],
         }] : []),
         ...(q ? [{
           OR: [

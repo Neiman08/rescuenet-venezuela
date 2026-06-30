@@ -674,6 +674,7 @@ model ImportedHumanitarianRecord {
   @@index([matchedRecordId])
   @@index([deletedAt])
   @@index([recordType, capturedAt(sort: Desc)])
+  @@index([capturedAt(sort: Desc)])
 }
 
 model IngestionAuditLog {
