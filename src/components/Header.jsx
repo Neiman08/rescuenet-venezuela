@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Bell, Menu, Search } from "lucide-react";
+import { Menu, Search } from "lucide-react";
 
 export default function Header() {
   return (
@@ -14,11 +14,7 @@ export default function Header() {
         </div>
         <span className="lg:hidden font-black text-navy truncate">RescateVZLA</span>
       </div>
-      <div className="flex items-center gap-3">
-        <button className="relative p-2 rounded-xl bg-slate-100" aria-label="Alertas">
-          <Bell size={20} />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-        </button>
+      <div className="flex items-center">
         <Link to="/login" className="hidden sm:block bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-semibold">
           Acceso ONG / Instituciones
         </Link>
