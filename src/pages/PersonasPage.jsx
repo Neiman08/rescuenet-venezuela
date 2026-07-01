@@ -31,27 +31,86 @@ const VENEZUELA_STATES = [
   "Portuguesa","Sucre","Táchira","Trujillo","Yaracuy","Zulia",
 ];
 
-function fmt(val) {
-  return val && val !== "No indicada" && val !== "Zona no indicada" ? val : null;
+// ─── visual helpers ──────────────────────────────────────────────────────────
+function isEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
+
+function isUrl(value) {
+  try { const u = new URL(String(value || "").trim()); return u.protocol.startsWith("http"); }
+  catch { return false; }
+}
+
+function isValidLocation(value) {
+  if (!value) return false;
+  const v = String(value).trim();
+  if (!v || v === "No indicada" || v === "Zona no indicada") return false;
+  return !isEmail(v) && !isUrl(v);
+}
+
+// Splits Redayuda's structured description into usable parts.
+// Pattern: "Ultima vez visto: email · Ficha: url · Fuente: domain"
+function parseDescription(raw) {
+  if (!raw) return { clean: null, fichaUrl: null };
+  let fichaUrl = null;
+  const kept = [];
+  for (const seg of raw.split(/\s*·\s*/)) {
+    const s = seg.trim();
+    if (!s) continue;
+    const lv = s.match(/^[Úu]ltima?\s+vez\s+visto:\s*(.+)$/i);
+    if (lv && isEmail(lv[1].trim())) continue;
+    const fi = s.match(/^Ficha:\s*(\S+)$/i);
+    if (fi && isUrl(fi[1])) { fichaUrl = fichaUrl || fi[1]; continue; }
+    if (/^Fuente:/i.test(s)) continue;
+    if (isUrl(s)) { fichaUrl = fichaUrl || s; continue; }
+    if (isEmail(s)) continue;
+    kept.push(s);
+  }
+  return { clean: kept.length ? kept.join(" · ") : null, fichaUrl };
+}
+
+// Normalize Venezuelan mobile to E.164 digits for wa.me links.
+function toWaPhone(phone) {
+  let p = String(phone || "").replace(/\D/g, "");
+  if (p.startsWith("04") && p.length === 11) p = "58" + p.slice(1);
+  else if (p.startsWith("4") && p.length === 10) p = "58" + p;
+  return p;
+}
+
+const STATUS_DUPLICATES = new Set([
+  "encontrado", "encontrada", "desaparecido", "desaparecida",
+  "hospitalizado", "hospitalizada", "rescatado", "rescatada",
+  "atrapado", "atrapada", "fallecido", "fallecida",
+]);
 
 function PersonCard({ person }) {
   const cfg = TYPE_CONFIG[person.type || person.recordType] || { label: "Persona", badge: "bg-slate-100 text-slate-700" };
   const date = person.capturedAt || person.updatedAt
     ? new Date(person.capturedAt || person.updatedAt).toLocaleDateString("es-VE", { day: "2-digit", month: "short", year: "numeric" })
     : null;
-  const name      = person.fullName || person.name;
-  const age       = person.approximateAge || person.age;
-  const gender    = person.gender || person.sex;
-  const location  = fmt(person.publicLocation) || fmt(person.currentPlace) || fmt(person.lastSeenPlace) || fmt(person.zone);
-  const state     = fmt(person.state);
-  const muni      = fmt(person.municipality);
-  const hospital  = fmt(person.hospital) || fmt(person.hospitalName);
+
+  const name     = person.fullName || person.name;
+  const age      = person.approximateAge || person.age;
+  const gender   = person.gender || person.sex;
+  const hospital = isValidLocation(person.hospital) ? person.hospital
+                 : isValidLocation(person.hospitalName) ? person.hospitalName : null;
+
+  const location = [person.publicLocation, person.currentPlace, person.lastSeenPlace, person.zone]
+    .find(isValidLocation) || null;
+  const muni     = isValidLocation(person.municipality) ? person.municipality : null;
+  const state    = isValidLocation(person.state) ? person.state : null;
+
+  const { clean: cleanDesc, fichaUrl } = parseDescription(person.description);
   const isRedayuda = person.isRedayuda || person.source === "Redayuda";
+  const phone      = person.phone;
+  const waPhone    = phone ? toWaPhone(phone) : null;
+  const showStatus = person.status &&
+    !STATUS_DUPLICATES.has(String(person.status).toLowerCase()) &&
+    !["activo", "Sin información", "sin información"].includes(person.status);
 
   return (
     <div className="card p-4 space-y-2 hover:shadow-md transition-shadow border border-slate-100">
-      {/* Header */}
+      {/* 1. Nombre + Badge */}
       <div className="flex items-start justify-between gap-2">
         <p className="font-black text-slate-800 leading-snug text-sm">{name || "Nombre no disponible"}</p>
         <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${cfg.badge}`}>
@@ -59,15 +118,8 @@ function PersonCard({ person }) {
         </span>
       </div>
 
-      {/* Age / Gender */}
-      {(age || gender) && (
-        <p className="text-xs text-slate-500">
-          {[age && `Edad: ${age}`, gender && `Sexo: ${gender}`].filter(Boolean).join(" · ")}
-        </p>
-      )}
-
-      {/* Photo */}
-      {person.photoUrl && (
+      {/* 2. Foto — solo si es URL completa */}
+      {isUrl(person.photoUrl) && (
         <img
           src={person.photoUrl}
           alt={name || "foto"}
@@ -76,46 +128,93 @@ function PersonCard({ person }) {
         />
       )}
 
-      {/* Hospital */}
+      {/* 3. Edad / Sexo */}
+      {(age || gender) && (
+        <p className="text-xs text-slate-500">
+          {[age && `Edad: ${age}`, gender && `Sexo: ${gender}`].filter(Boolean).join(" · ")}
+        </p>
+      )}
+
+      {/* 4. Cédula */}
+      {person.cedula && (
+        <p className="text-xs text-slate-600">
+          <span className="font-semibold">Cédula:</span> {person.cedula}
+        </p>
+      )}
+
+      {/* 5. Teléfono + Llamar / WhatsApp */}
+      {phone && (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-slate-600">
+            <span className="font-semibold">Contacto:</span> {phone}
+          </p>
+          <a
+            href={`tel:${phone}`}
+            className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100"
+          >
+            Llamar
+          </a>
+          <a
+            href={`https://wa.me/${waPhone}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700 hover:bg-green-100"
+          >
+            WhatsApp
+          </a>
+        </div>
+      )}
+
+      {/* 6. Hospital */}
       {hospital && (
         <p className="text-xs text-slate-600">
           <span className="font-semibold">Hospital:</span> {hospital}
         </p>
       )}
 
-      {/* Location */}
-      {(location || state || muni) && (
+      {/* 7. Última ubicación conocida */}
+      {location && (
+        <p className="text-xs text-slate-600">
+          <span className="font-semibold">Última ubicación:</span> {location}
+        </p>
+      )}
+
+      {/* 8. Zona / Municipio / Estado */}
+      {(muni || state) && (
         <p className="text-xs text-slate-600">
           <span className="font-semibold">Zona:</span>{" "}
-          {[location, muni && muni !== location ? muni : null, state].filter(Boolean).join(", ")}
+          {[muni, state].filter(Boolean).join(", ")}
         </p>
       )}
 
-      {/* Description */}
-      {person.description && (
-        <p className="text-xs text-slate-500 line-clamp-2">{person.description}</p>
+      {/* 9. Observaciones */}
+      {cleanDesc && (
+        <p className="text-xs text-slate-500 line-clamp-3">{cleanDesc}</p>
       )}
 
-      {/* Cedula + Phone (Redayuda) */}
-      {person.cedula && (
+      {/* 10. Ficha original */}
+      {fichaUrl && (
         <p className="text-xs text-slate-600">
-          <span className="font-semibold">Cédula:</span> {person.cedula}
-        </p>
-      )}
-      {person.phone && (
-        <p className="text-xs text-slate-600">
-          <span className="font-semibold">Contacto:</span> {person.phone}
+          <span className="font-semibold">Ficha:</span>{" "}
+          <a
+            href={fichaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:underline"
+          >
+            Ver ficha
+          </a>
         </p>
       )}
 
-      {/* Status */}
-      {person.status && !["activo", "Sin información"].includes(person.status) && (
+      {/* 11. Estado (solo si no duplica el badge) */}
+      {showStatus && (
         <p className="text-xs text-slate-500">
           <span className="font-semibold">Estado:</span> {person.status}
         </p>
       )}
 
-      {/* Footer */}
+      {/* Footer: fuente, verificación, fecha */}
       <div className="flex flex-wrap items-center gap-x-2 text-[10px] text-slate-400 pt-1 border-t border-slate-50">
         {isRedayuda && (
           <span className="bg-amber-50 text-amber-700 font-semibold px-1.5 py-0.5 rounded text-[10px]">
